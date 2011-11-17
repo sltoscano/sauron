@@ -16,6 +16,8 @@
 #include "resource.h"
 #include <mmsystem.h>
 
+extern HANDLE g_shmFile;
+
 static const COLORREF g_JointColorTable[NUI_SKELETON_POSITION_COUNT] = 
 {
     RGB(169, 176, 155), // NUI_SKELETON_POSITION_HIP_CENTER
@@ -454,6 +456,13 @@ void CSkeletalViewerApp::Nui_DrawSkeleton( bool bBlank, NUI_SKELETON_DATA * pSke
         SelectObject( m_SkeletonDC, hOldObj );
         DeleteObject(hJointPen);
     }
+
+    long* shm = (long*) MapViewOfFile(g_shmFile, FILE_MAP_WRITE, 0, 0, 0);
+    shm[0] = m_Points[NUI_SKELETON_POSITION_HAND_LEFT].x;
+    shm[1] = m_Points[NUI_SKELETON_POSITION_HAND_LEFT].y;
+    shm[2] = m_Points[NUI_SKELETON_POSITION_HAND_RIGHT].x;
+    shm[3] = m_Points[NUI_SKELETON_POSITION_HAND_RIGHT].y;
+    UnmapViewOfFile(shm);
 
     return;
 

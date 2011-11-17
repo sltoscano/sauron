@@ -22,13 +22,15 @@
 #include "SkeletalViewer.h"
 #include "resource.h"
 
+#include "shmem.h"
+
 // Global Variables:
 CSkeletalViewerApp	g_CSkeletalViewerApp;	// Application class
 HINSTANCE			g_hInst;				// current instance
 HWND				g_hWndApp;				// Windows Handle to main application
 TCHAR				g_szAppTitle[256];		// Application title
 
-
+HANDLE g_shmFile = NULL;
 
 
 int APIENTRY _tWinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPTSTR lpCmdLine,int nCmdShow)
@@ -51,6 +53,9 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPTSTR lpCmdL
 	wc.lpfnWndProc=DefDlgProc;
 	wc.lpszClassName=SZ_APPDLG_WINDOW_CLASS;
 	if(!RegisterClass(&wc))
+		return (0);
+
+	if(!create_memmap_file(g_shmFile, "kinect_shmem", sizeof(long)*4))
 		return (0);
 
 	// Create main application window
@@ -107,6 +112,8 @@ LONG CALLBACK CSkeletalViewerApp::WndProc(HWND hWnd, UINT message, WPARAM wParam
 			break;
 
 		case WM_DESTROY:
+			CloseHandle(g_shmFile);
+
 			// Uninitialize NUI
 			g_CSkeletalViewerApp.Nui_UnInit();
 
