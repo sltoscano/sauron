@@ -457,6 +457,8 @@ void CSkeletalViewerApp::Nui_DrawSkeleton( bool bBlank, NUI_SKELETON_DATA * pSke
         DeleteObject(hJointPen);
     }
 
+    // TODO: Put this in the loop above and move the MapViewOfFile/UnmapViewOfFile
+    // to the INIT/DESTROY messages in WndProc.
     long* shm = (long*) MapViewOfFile(g_shmFile, FILE_MAP_WRITE, 0, 0, 0);
     shm[0] = m_Points[NUI_SKELETON_POSITION_HAND_LEFT].x;
     shm[1] = m_Points[NUI_SKELETON_POSITION_HAND_LEFT].y;
