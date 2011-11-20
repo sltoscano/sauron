@@ -10,6 +10,8 @@
 #include <errno.h>
 #include <string.h>
 
+#define PACKETSIZE (20*2*4)
+
 int main()
 {
 	printf("starting server...\n");
@@ -19,8 +21,7 @@ int main()
 	int bytes_recieved;
 	int result = 1;
 
-	char send_data[1024];
-	char recv_data[1024];
+	char recv_data[PACKETSIZE];
 
 	sockaddr_in server_addr;
 	sockaddr_in client_addr;
@@ -39,7 +40,7 @@ int main()
 	}
 
 	server_addr.sin_family = AF_INET;
-	server_addr.sin_port = htons(5000);
+	server_addr.sin_port = htons(6969);
 	server_addr.sin_addr.s_addr = INADDR_ANY;
 	bzero(&server_addr.sin_zero, 8);
 
@@ -55,7 +56,7 @@ int main()
 		exit(1);
 	}
 
-	printf("\nTCPServer waiting for client on port 5000");
+	printf("\nTCPServer waiting for client on port 6969");
 	fflush(stdout);
 
 	while(1)
@@ -67,39 +68,31 @@ int main()
 		printf("\nGot a connection from: (%s, %d)",
 			inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 
+		fflush(stdout);
+
 		while (1)
 		{
-			printf("\nSEND (q or Q to quit): ");
-			gets(send_data);
+			char* recv_pos = (char*) &recv_data;
 
-			if (strcmp(send_data, "q") == 0 || strcmp(send_data, "Q") == 0)
+			bytes_recieved = recv(connected, recv_data, PACKETSIZE, 0);
+
+			while (bytes_recieved < PACKETSIZE)
 			{
-				send(connected, send_data, strlen(send_data), 0);
-				close(connected);
-				break;
-			}
-			else
-			{
-				send(connected, send_data, strlen(send_data), 0);
+				recv_pos += bytes_recieved;
+				bytes_recieved += recv(connected, recv_pos, PACKETSIZE, 0);
 			}
 
-			bytes_recieved = recv(connected, recv_data, 1024, 0);
-
-			recv_data[bytes_recieved] = '\0';
-
-			if (strcmp(recv_data, "q") == 0 || strcmp(recv_data, "Q") == 0)
+			for (int i=0; i<PACKETSIZE; ++i)
 			{
-				close(connected);
-				break;
+				printf("%x ", recv_data[i]);
 			}
-			else
-			{
-				printf("\nRECV = %s", recv_data);
-			}
+			printf("\n");
+
 			fflush(stdout);
 		}
 	}
 
+	close(connected);
 	close(sock);
 	return 0;
 }
