@@ -22,7 +22,6 @@
 #include "SkeletalViewer.h"
 #include "resource.h"
 
-#include "shmem.h"
 
 // Global Variables:
 CSkeletalViewerApp	g_CSkeletalViewerApp;	// Application class
@@ -30,8 +29,11 @@ HINSTANCE			g_hInst;				// current instance
 HWND				g_hWndApp;				// Windows Handle to main application
 TCHAR				g_szAppTitle[256];		// Application title
 
-HANDLE g_shmFile = NULL;
+// Queue for sending data to the network thread.
+SkeletalDataQueue g_skeletalData;
 
+// Network transport.
+NetworkClient g_client;
 
 int APIENTRY _tWinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPTSTR lpCmdLine,int nCmdShow)
 {
@@ -53,9 +55,6 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPTSTR lpCmdL
 	wc.lpfnWndProc=DefDlgProc;
 	wc.lpszClassName=SZ_APPDLG_WINDOW_CLASS;
 	if(!RegisterClass(&wc))
-		return (0);
-
-	if(!create_memmap_file(g_shmFile, "kinect_shmem", sizeof(long)*4))
 		return (0);
 
 	// Create main application window
@@ -89,6 +88,14 @@ LONG CALLBACK CSkeletalViewerApp::WndProc(HWND hWnd, UINT message, WPARAM wParam
 			{
 			LOGFONT lf;
 
+			// Init the network
+			g_client.NetworkStartup("www.trisourcesoftware.com", 6969);
+			g_CSkeletalViewerApp.m_networkClient=&g_client;
+
+			// Init the transport queue
+			g_skeletalData.Initialize();
+			g_CSkeletalViewerApp.m_networkQueue=&g_skeletalData;
+
 			// Clean state the class
 			g_CSkeletalViewerApp.Nui_Zero();
 
@@ -112,8 +119,6 @@ LONG CALLBACK CSkeletalViewerApp::WndProc(HWND hWnd, UINT message, WPARAM wParam
 			break;
 
 		case WM_DESTROY:
-			CloseHandle(g_shmFile);
-
 			// Uninitialize NUI
 			g_CSkeletalViewerApp.Nui_UnInit();
 
@@ -122,6 +127,8 @@ LONG CALLBACK CSkeletalViewerApp::WndProc(HWND hWnd, UINT message, WPARAM wParam
 
 			// Quit the main message pump
 			PostQuitMessage(0);
+
+			g_client.NetworkShutdown();
 			break;
 	}
 	return (FALSE);

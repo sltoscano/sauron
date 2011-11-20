@@ -16,6 +16,10 @@
 #include "MSR_NuiApi.h"
 #include "DrawDevice.h"
 
+#include "critical_section.h"
+#include "network_client.h"
+#include "skeletal_data.h"
+
 #define SZ_APPDLG_WINDOW_CLASS        _T("SkeletalViewerAppDlgWndClass")
 
 class CSkeletalViewerApp
@@ -40,7 +44,18 @@ public:
 
 private:
     static DWORD WINAPI     Nui_ProcessThread(LPVOID pParam);
+    static DWORD WINAPI     NetworkThread(LPVOID pParam);
 
+    // Network client
+    NetworkClient* m_networkClient;
+
+    // Network transmission queue
+    SkeletalDataQueue* m_networkQueue;
+    CSection m_queueLock;
+
+    // Thread to send items from the queue
+    HANDLE        m_hThNetworkProcess;
+    HANDLE        m_hEvNetworkProcessStop;
 
     // NUI and draw stuff
     DrawDevice    m_DrawDepth;

@@ -16,7 +16,8 @@
 #include "resource.h"
 #include <mmsystem.h>
 
-extern HANDLE g_shmFile;
+#include "network_client.h"
+
 
 static const COLORREF g_JointColorTable[NUI_SKELETON_POSITION_COUNT] = 
 {
@@ -54,6 +55,8 @@ void CSkeletalViewerApp::Nui_Zero()
     m_pVideoStreamHandle = NULL;
     m_hThNuiProcess=NULL;
     m_hEvNuiProcessStop=NULL;
+    m_hThNetworkProcess=NULL;
+    m_hEvNetworkProcessStop=NULL;
     ZeroMemory(m_Pen,sizeof(m_Pen));
     m_SkeletonDC = NULL;
     m_SkeletonBMP = NULL;
@@ -160,6 +163,9 @@ HRESULT CSkeletalViewerApp::Nui_Init()
     m_hEvNuiProcessStop=CreateEvent(NULL,FALSE,FALSE,NULL);
     m_hThNuiProcess=CreateThread(NULL,0,Nui_ProcessThread,this,0,NULL);
 
+    m_hEvNetworkProcessStop=CreateEvent(NULL,FALSE,FALSE,NULL);
+    m_hThNetworkProcess=CreateThread(NULL,0,NetworkThread,this,0,NULL);
+
     return hr;
 }
 
@@ -195,6 +201,21 @@ void CSkeletalViewerApp::Nui_UnInit( )
             CloseHandle(m_hThNuiProcess);
         }
         CloseHandle(m_hEvNuiProcessStop);
+    }
+
+    // Stop the network processing thread
+    if(m_hEvNetworkProcessStop!=NULL)
+    {
+        // Signal the thread
+        SetEvent(m_hEvNetworkProcessStop);
+
+        // Wait for thread to stop
+        if(m_hThNetworkProcess!=NULL)
+        {
+            WaitForSingleObject(m_hThNetworkProcess,INFINITE);
+            CloseHandle(m_hThNetworkProcess);
+        }
+        CloseHandle(m_hEvNetworkProcessStop);
     }
 
     NuiShutdown( );
@@ -285,6 +306,72 @@ DWORD WINAPI CSkeletalViewerApp::Nui_ProcessThread(LPVOID pParam)
             case 3:
                 pthis->Nui_GotSkeletonAlert( );
                 break;
+        }
+
+        // Dequeue from network queue if item has been transmitted
+        {
+            Lock cs(&pthis->m_queueLock);
+            if (!pthis->m_networkQueue->IsEmpty() &&
+                pthis->m_networkQueue->Front().m_transmitted)
+            {
+                pthis->m_networkQueue->Remove();
+            }
+        }
+    }
+
+    return (0);
+}
+
+DWORD WINAPI CSkeletalViewerApp::NetworkThread(LPVOID pParam)
+{
+    CSkeletalViewerApp *pthis=(CSkeletalViewerApp *) pParam;
+    HANDLE                hEvents[4];
+    int                    nEventIdx;
+
+    // Configure events to be listened on
+    hEvents[0]=pthis->m_hEvNetworkProcessStop;
+    hEvents[1]=pthis->m_hNextDepthFrameEvent;
+    hEvents[2]=pthis->m_hNextVideoFrameEvent;
+    hEvents[3]=pthis->m_hNextSkeletonEvent;
+
+    // Main thread loop
+    while(1)
+    {
+        // Wait for an event to be signaled
+        nEventIdx=WaitForMultipleObjects(sizeof(hEvents)/sizeof(hEvents[0]),hEvents,FALSE,100);
+
+        // If the stop event, stop looping and exit
+        if(nEventIdx==0)
+            break;
+
+        // Process signal events
+        switch(nEventIdx)
+        {
+        case 1:
+            break;
+        case 2:
+            break;
+        case 3:
+            // Send an item off if it hasn't been transmitted yet.
+            {
+                SkeletalData* unsentData = NULL;
+                {
+                    Lock cs(&pthis->m_queueLock);
+                    if (!pthis->m_networkQueue->IsEmpty() &&
+                        !pthis->m_networkQueue->Front().m_transmitted)
+                    {
+                        unsentData = &pthis->m_networkQueue->Front();
+                    }
+                }
+                if (unsentData)
+                {
+                    if (pthis->m_networkClient->NetworkBlockingSend(*unsentData))
+                    {
+                        unsentData->m_transmitted = true;
+                    }
+                }
+            }
+            break;
         }
     }
 
@@ -427,11 +514,19 @@ void CSkeletalViewerApp::Nui_DrawSkeleton( bool bBlank, NUI_SKELETON_DATA * pSke
     int scaleY = height;
     float fx=0,fy=0;
     int i;
+    SkeletalData data;
+    data.m_actorId = WhichSkeletonColor;
+    data.m_transmitted = false;
     for (i = 0; i < NUI_SKELETON_POSITION_COUNT; i++)
     {
         NuiTransformSkeletonToDepthImageF( pSkel->SkeletonPositions[i], &fx, &fy );
-        m_Points[i].x = (int) ( fx * scaleX + 0.5f );
-        m_Points[i].y = (int) ( fy * scaleY + 0.5f );
+        // Send the points to the queue for network transmission
+        data.m_joints[i].x = m_Points[i].x = (int) ( fx * scaleX + 0.5f );
+        data.m_joints[i].y = m_Points[i].y = (int) ( fy * scaleY + 0.5f );
+    }
+    {
+        Lock cs(&m_queueLock);
+        m_networkQueue->Insert(data);
     }
 
     SelectObject(m_SkeletonDC,m_Pen[WhichSkeletonColor%m_PensTotal]);
@@ -456,15 +551,6 @@ void CSkeletalViewerApp::Nui_DrawSkeleton( bool bBlank, NUI_SKELETON_DATA * pSke
         SelectObject( m_SkeletonDC, hOldObj );
         DeleteObject(hJointPen);
     }
-
-    // TODO: Put this in the loop above and move the MapViewOfFile/UnmapViewOfFile
-    // to the INIT/DESTROY messages in WndProc.
-    long* shm = (long*) MapViewOfFile(g_shmFile, FILE_MAP_WRITE, 0, 0, 0);
-    shm[0] = m_Points[NUI_SKELETON_POSITION_HAND_LEFT].x;
-    shm[1] = m_Points[NUI_SKELETON_POSITION_HAND_LEFT].y;
-    shm[2] = m_Points[NUI_SKELETON_POSITION_HAND_RIGHT].x;
-    shm[3] = m_Points[NUI_SKELETON_POSITION_HAND_RIGHT].y;
-    UnmapViewOfFile(shm);
 
     return;
 
