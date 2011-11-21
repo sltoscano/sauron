@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <signal.h>
 
 #define PACKETSIZE (20*2*4)
 
