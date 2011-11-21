@@ -103,9 +103,6 @@ int main()
     // Spawn a child process for this connection.
     if (!fork())
     {
-      // Child doesn't need the listener.
-      //close(sock);
-
       while(1)
       {
         char* recv_buf = (char*) &recv_data;
@@ -136,8 +133,8 @@ int main()
 
         fflush(stdout);
       }
-        
-exit(0);
+
+      exit(0);
     }
 
     // Parent doesn't need this.

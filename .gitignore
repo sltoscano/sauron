@@ -1,7 +1,11 @@
+.DS_Store
+sauron-server/linux/server
 skeletal-viewer/Debug/
+skeletal-viewer/ipch/
 skeletal-viewer/SkeletalViewer.opensdf
 skeletal-viewer/SkeletalViewer.sdf
 skeletal-viewer/SkeletalViewer.vcxproj.user
-skeletal-viewer/ipch/
 skeletal-viewer/SkeletalViewer.aps
+xcode/sauron-server.xcodeproj/project.xcworkspace/
+xcode/sauron-server.xcodeproj/xcuserdata/
 *.suo
