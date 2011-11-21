@@ -17,6 +17,9 @@
 // How many pending connections the queue will hold.
 #define BACKLOG 10
 
+// The port that this server will listen on
+#define OUTSIDEPORT 6969
+
 void sigchld_handler(int s)
 {
   while (waitpid(-1, 0, WNOHANG) > 0);
@@ -52,7 +55,7 @@ int main()
   }
 
   server_addr.sin_family = AF_INET;
-  server_addr.sin_port = htons(6969);
+  server_addr.sin_port = htons(OUTSIDEPORT);
   server_addr.sin_addr.s_addr = INADDR_ANY;
   bzero(&server_addr.sin_zero, 8);
 
@@ -133,6 +136,8 @@ int main()
 
         fflush(stdout);
       }
+        
+exit(0);
     }
 
     // Parent doesn't need this.
