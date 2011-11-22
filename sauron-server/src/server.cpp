@@ -89,7 +89,7 @@ int main()
       continue;
     }
 
-    printf("Got a connection from: (%s, %d)i\n",
+    printf("Got a connection from: (%s, %d)\n",
       inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 
     fflush(stdout);
