@@ -57,33 +57,35 @@ void NetworkClient::NetworkShutdown()
     WSACleanup();
 }
 
-extern void packi32(unsigned char *buf, unsigned long int i);
-
-bool NetworkClient::NetworkBlockingSend(SkeletalData& data)
+bool NetworkClient::NetworkBlockingSend(SkeletalDataPacket& packet)
 {
     if (m_sock == 0)
     {
         return false;
     }
 
-    int bytes_sent;
+    int packet_size = packet.header.m_headerSize + packet.header.m_payloadSize;
+    unsigned char* send_header = new unsigned char[packet_size];
+    memset(send_header, 0, packet_size);
+    unsigned char* packet_buffer = send_header;
+    packet.header.Serialize(send_header);
+    packet_buffer += packet.header.m_headerSize;
+    packet.data.Serialize(packet_buffer);
 
-    int countof_joints = sizeof(data.m_joints)/sizeof(data.m_joints[0]);
+    int bytes_sent = 0;
+    int send_result = -1;
+    int total_packet_size = packet_size;
+    packet_buffer = send_header;
 
-    int packet_length = countof_joints*2*4;
-    unsigned char* send_data = new unsigned char[packet_length];
-    ZeroMemory(send_data, sizeof(char)*packet_length);
-    unsigned char* data_buffer = send_data;
-
-    for (int i=0; i < countof_joints; ++i)
+    do
     {
-        packi32(data_buffer, data.m_joints[i].x);
-        data_buffer+=4;
-        packi32(data_buffer, data.m_joints[i].y);
-        data_buffer+=4;
+      send_result = send(m_sock, (const char*) packet_buffer, packet_size, 0);
+      bytes_sent += send_result;
+      packet_buffer += send_result;
+      packet_size -= send_result;
     }
+    while (send_result != -1 && bytes_sent < total_packet_size);
 
-    bytes_sent = send(m_sock, (const char*) send_data, packet_length, 0);
-    delete[] send_data;
-    return bytes_sent > 0;
+    delete[] send_header;
+    return bytes_sent == total_packet_size;
 }

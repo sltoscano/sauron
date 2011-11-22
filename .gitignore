@@ -8,5 +8,6 @@ skeletal-viewer/ipch/
 skeletal-viewer/SkeletalViewer.aps
 skeletal-viewer/SkeletalViewer.opensdf
 skeletal-viewer/SkeletalViewer.sdf
+skeletal-viewer/SkeletalViewer.vcxproj.filters
 skeletal-viewer/SkeletalViewer.vcxproj.user
 *.suo

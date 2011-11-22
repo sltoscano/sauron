@@ -354,7 +354,7 @@ DWORD WINAPI CSkeletalViewerApp::NetworkThread(LPVOID pParam)
         case 3:
             // Send an item off if it hasn't been transmitted yet.
             {
-                SkeletalData* unsentData = NULL;
+                SkeletalDataPacket* unsentData = NULL;
                 {
                     Lock cs(&pthis->m_queueLock);
                     if (!pthis->m_networkQueue->IsEmpty() &&
@@ -368,6 +368,10 @@ DWORD WINAPI CSkeletalViewerApp::NetworkThread(LPVOID pParam)
                     if (pthis->m_networkClient->NetworkBlockingSend(*unsentData))
                     {
                         unsentData->m_transmitted = true;
+                    }
+                    else
+                    {
+                      assert(false);
                     }
                 }
             }
@@ -510,23 +514,29 @@ void CSkeletalViewerApp::Nui_DrawSkeleton( bool bBlank, NUI_SKELETON_DATA * pSke
         PatBlt( m_SkeletonDC, 0, 0, width, height, BLACKNESS );
     }
 
+    SkeletalDataPacket packet;
+    packet.m_transmitted = false;
+    packet.header.m_headerSize = sizeof(packet.header);
+    packet.header.m_payloadSize = sizeof(packet.data);
+    packet.header.m_payloadKind = kSkeletonData;
+    packet.header.m_cameraId = 11;
+    packet.header.m_actorId = WhichSkeletonColor;
+    packet.header.m_clientTimestamp = GetCurrentTime();
+
     int scaleX = width; //scaling up to image coordinates
     int scaleY = height;
     float fx=0,fy=0;
     int i;
-    SkeletalData data;
-    data.m_actorId = WhichSkeletonColor;
-    data.m_transmitted = false;
     for (i = 0; i < NUI_SKELETON_POSITION_COUNT; i++)
     {
         NuiTransformSkeletonToDepthImageF( pSkel->SkeletonPositions[i], &fx, &fy );
-        // Send the points to the queue for network transmission
-        data.m_joints[i].x = m_Points[i].x = (int) ( fx * scaleX + 0.5f );
-        data.m_joints[i].y = m_Points[i].y = (int) ( fy * scaleY + 0.5f );
+        packet.data.m_joints[i].x = m_Points[i].x = (int) ( fx * scaleX + 0.5f );
+        packet.data.m_joints[i].y = m_Points[i].y = (int) ( fy * scaleY + 0.5f );
     }
+    // Send the packet to the queue for network transmission
     {
         Lock cs(&m_queueLock);
-        m_networkQueue->Insert(data);
+        m_networkQueue->Insert(packet);
     }
 
     SelectObject(m_SkeletonDC,m_Pen[WhichSkeletonColor%m_PensTotal]);

@@ -1,20 +1,15 @@
 #pragma once
 
 #include "linked_queue.cpp"
+#include "../sauron-protocol/protocol.h"
 
 
-class SkeletalData
+class SkeletalDataPacket
 {
 public:
-  SkeletalData() : 
-      m_actorId(-1),
-      m_transmitted(false)
-  {
-      ZeroMemory(m_joints, sizeof(m_joints));
-  };
-  POINT m_joints[20];
-  int m_actorId;
+  SauronFrameHeader header;
+  SkeletalData data;
   bool m_transmitted;
 };
 
-typedef LinkedQueue<SkeletalData> SkeletalDataQueue;
+typedef LinkedQueue<SkeletalDataPacket> SkeletalDataQueue;
