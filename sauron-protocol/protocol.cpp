@@ -2,8 +2,6 @@
 // protocol.cpp - Protocol definitions for network packets
 //
 
-#pragma once
-
 #include "transport.h"
 #include "protocol.h"
 
@@ -13,9 +11,8 @@ int DepthData::Serialize(unsigned char* buffer)
   return 0;
 }
 
-bool DepthData::DeSerialize(const char* buffer, DepthData& data)
+void DepthData::DeSerialize(unsigned char* buffer)
 {
-  return false;
 }
 
 int VideoData::Serialize(unsigned char* buffer)
@@ -23,9 +20,8 @@ int VideoData::Serialize(unsigned char* buffer)
   return 0;
 }
 
-bool VideoData::DeSerialize(const char* buffer, VideoData& data)
+void VideoData::DeSerialize(unsigned char* buffer)
 {
-  return false;
 }
 
 int SkeletalData::Serialize(unsigned char* buffer)
@@ -41,14 +37,21 @@ int SkeletalData::Serialize(unsigned char* buffer)
   return totalSize;
 }
 
-bool SkeletalData::DeSerialize(const char* buffer, SkeletalData& data)
+void SkeletalData::DeSerialize(unsigned char* buffer)
 {
-  return false;
+  for (int i=0; i < SRN_MAX_JOINTS; ++i)
+  {
+    unpack(buffer, "ll",
+      &m_joints[i].x,
+      &m_joints[i].y);
+    buffer += 8;
+  }
 }
 
 int SauronFrameHeader::Serialize(unsigned char* buffer)
 {
-  return pack(buffer, "lllllL",
+  return pack(buffer, "llllllL",
+    m_signature,
     m_headerSize,
     m_payloadSize,
     m_payloadKind,
@@ -57,7 +60,14 @@ int SauronFrameHeader::Serialize(unsigned char* buffer)
     m_clientTimestamp);
 }
 
-bool SauronFrameHeader::DeSerialize(const char* buffer, SauronFrameHeader& data)
+void SauronFrameHeader::DeSerialize(unsigned char* buffer)
 {
-  return false;
+  unpack(buffer, "llllllL",
+    &m_signature,
+    &m_headerSize,
+    &m_payloadSize,
+    &m_payloadKind,
+    &m_cameraId,
+    &m_actorId,
+    &m_clientTimestamp);
 }

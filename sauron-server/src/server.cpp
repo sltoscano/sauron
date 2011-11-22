@@ -12,13 +12,14 @@
 #include <string.h>
 #include <signal.h>
 
-#define PACKETSIZE (20*2*4)
+#include "receiver.h"
 
 // How many pending connections the queue will hold.
 #define BACKLOG 10
 
 // The port that this server will listen on
 #define OUTSIDEPORT 6969
+
 
 void sigchld_handler(int s)
 {
@@ -28,32 +29,22 @@ void sigchld_handler(int s)
 int main()
 {
   printf("Starting server...\n");
-  
-  int sock;
-  int connected;
-  int bytes_recieved;
-  int result = 1;
 
-  char recv_data[PACKETSIZE];
-
-  sockaddr_in server_addr;
-  sockaddr_in client_addr;
-  socklen_t sin_size;
-
-  struct sigaction sa;
-
+  int sock = 0;
   if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == -1)
   {
     perror("Socket");
     exit(1);
   }
 
+  int result = 1;
   if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &result, sizeof(int)) == -1)
   {
     perror("Setsockopt");
     exit(1);
   }
 
+  sockaddr_in server_addr;
   server_addr.sin_family = AF_INET;
   server_addr.sin_port = htons(OUTSIDEPORT);
   server_addr.sin_addr.s_addr = INADDR_ANY;
@@ -72,6 +63,7 @@ int main()
   }
 
   // Reap all dead processes.
+  struct sigaction sa;
   sa.sa_handler = sigchld_handler;
   sigemptyset(&sa.sa_mask);
   sa.sa_flags = SA_RESTART;
@@ -84,11 +76,13 @@ int main()
   printf("Sauron waiting for client connections on port 6969\n");
   fflush(stdout);
 
+  sockaddr_in client_addr;
+
   while(1)
   {
-    sin_size = sizeof(sockaddr_in);
+    socklen_t sin_size = sizeof(sockaddr_in);
 
-    connected = accept(sock, (struct sockaddr *)&client_addr, &sin_size);
+    int connected = accept(sock, (struct sockaddr *)&client_addr, &sin_size);
     if (connected == -1)
     {
       perror("Accept");
@@ -100,41 +94,10 @@ int main()
 
     fflush(stdout);
 
-    // Spawn a child process for this connection.
+    // Spawn a child process and receive packets for this connection.
     if (!fork())
     {
-      while(1)
-      {
-        char* recv_buf = (char*) &recv_data;
-
-        bytes_recieved = recv(connected, recv_data, PACKETSIZE, 0);
-
-        // Check if the client disconnected.
-        if (bytes_recieved <= 0)
-        {
-          printf("Got a disconnect from: (%s, %d)\n",
-            inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-          fflush(stdout);
-          close(connected);
-          break;
-        }
-
-        while (bytes_recieved < PACKETSIZE)
-        {
-          recv_buf += bytes_recieved;
-          bytes_recieved += recv(connected, recv_buf, PACKETSIZE, 0);
-        }
-
-        for (int i=0; i<PACKETSIZE; ++i)
-        {
-          printf("%c ", recv_data[i]);
-        }
-        printf("\n");
-
-        fflush(stdout);
-      }
-
-      exit(0);
+      recv_loop(connected, client_addr);
     }
 
     // Parent doesn't need this.

@@ -27,14 +27,14 @@ class DepthData : public RGBData
 {
 public:
   int Serialize(unsigned char* buffer);
-  static bool DeSerialize(const char* buffer, DepthData& data);
+  void DeSerialize(unsigned char* buffer);
 };
 
 class VideoData : public RGBData
 {
 public:
   int Serialize(unsigned char* buffer);
-  static bool DeSerialize(const char* buffer, VideoData& data);
+  void DeSerialize(unsigned char* buffer);
 };
 
 class SkeletalData
@@ -52,20 +52,32 @@ public:
   Point m_joints[SRN_MAX_JOINTS];
 
   int Serialize(unsigned char* buffer);
-  static bool DeSerialize(const char* buffer, SkeletalData& data);
+  void DeSerialize(unsigned char* buffer);
 };
 
 typedef enum _SauronFrameKind
 {
+  kInvalidFrameKind = -1,
   kVideoFrame = 0,
   kDepthData,
   kSkeletonData,
-  kKindCount,
+  kFrameKindCount,
 } SauronFrameKind;
 
 class SauronFrameHeader
 {
 public:
+  SauronFrameHeader() :
+    m_signature('SRN1'),
+    m_headerSize(0),
+    m_payloadSize(0),
+    m_payloadKind(kInvalidFrameKind),
+    m_cameraId(0),
+    m_actorId(0),
+    m_clientTimestamp(0)
+  {
+  }
+  int m_signature;
   int m_headerSize;
   int m_payloadSize;
   SauronFrameKind m_payloadKind;
@@ -74,5 +86,5 @@ public:
   unsigned int m_clientTimestamp;
 
   int Serialize(unsigned char* buffer);
-  static bool DeSerialize(const char* buffer, SauronFrameHeader& data);
+  void DeSerialize(unsigned char* buffer);
 };
