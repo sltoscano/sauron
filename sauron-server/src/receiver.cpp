@@ -77,13 +77,13 @@ void recv_loop(int connected, sockaddr_in client_addr)
   sprintf(depth_shmem_name, "SRN_%d_%d", kDepthData, shmem_key);
   char skele_shmem_name[20] = "";
   sprintf(skele_shmem_name, "SRN_%d_%d", kSkeletonData, shmem_key);
-  
+
   // Allocate local and shared memory for the video traffic
   int video_packet_size = sizeof(VideoData);
   unsigned char* video_payload = new unsigned char[video_packet_size];
-  void* video_shaddr = 0;
+  char* video_shaddr = 0;
   int video_shfd = -1;
-  if(!create_memory_map(vid_shmem_name, video_packet_size, &video_shaddr, &video_shfd))
+  if(!create_memory_map(vid_shmem_name, video_packet_size+header_packet_size, (void**)&video_shaddr, &video_shfd))
   {
     printh(client_addr);
     printf("Error creating shared memory object: '%s'", vid_shmem_name);
@@ -93,9 +93,9 @@ void recv_loop(int connected, sockaddr_in client_addr)
   // Allocate local and shared memory for the depth traffic
   int depth_packet_size = sizeof(DepthData);
   unsigned char* depth_payload = new unsigned char[depth_packet_size];
-  void* depth_shaddr = 0;
+  char* depth_shaddr = 0;
   int depth_shfd = -1;
-  if(!create_memory_map(depth_shmem_name, depth_packet_size, &depth_shaddr, &depth_shfd))
+  if(!create_memory_map(depth_shmem_name, depth_packet_size+header_packet_size, (void**)&depth_shaddr, &depth_shfd))
   {
     printh(client_addr);
     printf("Error creating shared memory object: '%s'", depth_shmem_name);
@@ -105,9 +105,9 @@ void recv_loop(int connected, sockaddr_in client_addr)
   // Allocate local and shared memory for the skeleton traffic
   int skeleton_packet_size = sizeof(SkeletalData);
   unsigned char* skeleton_payload = new unsigned char[skeleton_packet_size];
-  void* skele_shaddr = 0;
+  char* skele_shaddr = 0;
   int skele_shfd = -1;
-  if(!create_memory_map(skele_shmem_name, skeleton_packet_size, &skele_shaddr, &skele_shfd))
+  if(!create_memory_map(skele_shmem_name, skeleton_packet_size+header_packet_size, (void**)&skele_shaddr, &skele_shfd))
   {
     printh(client_addr);
     printf("Error creating shared memory object: '%s'", skele_shmem_name);
@@ -149,7 +149,8 @@ void recv_loop(int connected, sockaddr_in client_addr)
         }
         VideoData video_data;
         video_data.DeSerialize(video_payload);
-        memcpy(video_shaddr, &video_data, sizeof(video_data));
+        memcpy(video_shaddr, &frame_header, header_packet_size);
+        memcpy(video_shaddr+header_packet_size, &video_data, sizeof(video_data));
         break;
       }
       case kDepthData:
@@ -163,7 +164,8 @@ void recv_loop(int connected, sockaddr_in client_addr)
         }
         DepthData depth_data;
         depth_data.DeSerialize(depth_payload);
-        memcpy(depth_shaddr, &depth_data, sizeof(depth_data));
+        memcpy(depth_shaddr, &frame_header, header_packet_size);
+        memcpy(depth_shaddr+header_packet_size, &depth_data, sizeof(depth_data));
         break;
       }
       case kSkeletonData:
@@ -177,7 +179,8 @@ void recv_loop(int connected, sockaddr_in client_addr)
         }
         SkeletalData skeleton_data;
         skeleton_data.DeSerialize(skeleton_payload);
-        memcpy(skele_shaddr, &skeleton_data, sizeof(skeleton_data));
+        memcpy(skele_shaddr, &frame_header, header_packet_size);
+        memcpy(skele_shaddr+header_packet_size, &skeleton_data, sizeof(skeleton_data));
         break;
       }
       default:
@@ -195,9 +198,9 @@ void recv_loop(int connected, sockaddr_in client_addr)
   // Cleanup shared and local memory.
   // Do not shutdown a server when clients are connected or shmem objects will leak!
   // TODO: Add a CTRL-C handler for last resort cleanup.
-  destroy_memory_map(vid_shmem_name, video_packet_size, video_shaddr, video_shfd);
-  destroy_memory_map(depth_shmem_name, depth_packet_size, depth_shaddr, depth_shfd);
-  destroy_memory_map(skele_shmem_name, skeleton_packet_size, skele_shaddr, skele_shfd);
+  destroy_memory_map(vid_shmem_name, video_packet_size+header_packet_size, video_shaddr, video_shfd);
+  destroy_memory_map(depth_shmem_name, depth_packet_size+header_packet_size, depth_shaddr, depth_shfd);
+  destroy_memory_map(skele_shmem_name, skeleton_packet_size+header_packet_size, skele_shaddr, skele_shfd);
   delete[] header_packet;
   delete[] video_payload;
   delete[] depth_payload;

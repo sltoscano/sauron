@@ -98,7 +98,7 @@ int main()
 
     // Spawn a child process and receive packets for this connection.
     pid_t recv_child = fork();
-    
+
     // The pid will be used to lookup shared memory for each payload kind.
     if (!recv_child)
     {
