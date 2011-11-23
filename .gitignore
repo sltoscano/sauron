@@ -1,4 +1,5 @@
 .DS_Store
+sauron-client/linux/client
 sauron-server/linux/server
 sauron-server/xcode/sauron-server.xcodeproj/project.xcworkspace/
 sauron-server/xcode/sauron-server.xcodeproj/xcuserdata/

@@ -37,7 +37,7 @@ int main(int argc, char* argv[])
 	}
 
 	server_addr.sin_family = AF_INET;
-	server_addr.sin_port = htons(5000);
+	server_addr.sin_port = htons(6969);
 	server_addr.sin_addr = *((in_addr *)host->h_addr);
 	bzero(&server_addr.sin_zero, 8);
 
@@ -49,19 +49,6 @@ int main(int argc, char* argv[])
 
 	while(1)
 	{
-		bytes_recieved = recv(sock, recv_data, 1024, 0);
-		recv_data[bytes_recieved] = '\0';
-
-		if (strcmp(recv_data, "q") == 0 || strcmp(recv_data, "Q") == 0)
-		{
-			close(sock);
-			break;
-		}
-		else
-		{
-			printf("\nRecieved data = %s", recv_data);
-		}
-
 		printf("\nSEND (q or Q to quit): ");
 		gets(send_data);
 
