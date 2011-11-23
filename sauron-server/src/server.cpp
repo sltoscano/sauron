@@ -5,12 +5,13 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+#include <errno.h>
+#include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <errno.h>
 #include <string.h>
-#include <signal.h>
+#include <unistd.h>
 
 #include "receiver.h"
 
@@ -99,7 +100,15 @@ int main()
     {
       recv_loop(connected, client_addr);
     }
-
+/*
+    // Spawn another child process to send packets for this connection.
+    if (!fork())
+    {
+      close(sock);
+      close(connected);
+      listener();
+    }
+*/
     // Parent doesn't need this.
     close(connected);
   }

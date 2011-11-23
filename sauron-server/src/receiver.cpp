@@ -15,8 +15,15 @@
 #include "../../sauron-protocol/protocol.h"
 #include "receiver.h"
 
+// Print a client header 
+void printh(const sockaddr_in& client_addr)
+{
+  printf("\t(%s, %d) ",
+         inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+}
 
-bool do_recv(int connected, int recv_size, unsigned char* recv_buffer)
+bool do_recv(int connected, int recv_size, unsigned char* recv_buffer,
+             const char* name, const sockaddr_in& client_addr)
 {
   memset(recv_buffer, 0, recv_size);
   int packet_size = recv_size;
@@ -36,8 +43,18 @@ bool do_recv(int connected, int recv_size, unsigned char* recv_buffer)
   while (recv_result > 0 && bytes_recv < total_packet_size);
 
   // Check if the client disconnected.
-  if (recv_result <= 0)
+  if (recv_result == 0)
   {
+    printh(client_addr);
+    printf("Client disconnected during %s data recv, disconnecting.\n", name);
+    fflush(stdout);
+    return false;
+  }
+  else if (recv_result == -1)
+  {
+    printh(client_addr);
+    printf("Client recv failed during %s data recv, disconnecting.\n", name);
+    fflush(stdout);
     return false;
   }
 
@@ -60,11 +77,9 @@ void recv_loop(int connected, sockaddr_in client_addr)
     bool disconnect_client = false;
 
     // Retrieve the header from the client.
-    if (!do_recv(connected, header_packet_size, header_packet))
+    if (!do_recv(connected, header_packet_size,
+                 header_packet, "header", client_addr))
     {
-      printf("Got disconnect from: (%s, %d)\n",
-             inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-      fflush(stdout);
       break;
     }
     SauronFrameHeader frame_header;
@@ -73,8 +88,9 @@ void recv_loop(int connected, sockaddr_in client_addr)
     // Check validity of the data received.
     if (frame_header.m_signature != 'SRN1')
     {
-      printf("Got malformed packet from: (%s, %d)\n",
-             inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+      printh(client_addr);
+      printf("Got malformed packet with bad signature: '%d', disconnecting.\n",
+             frame_header.m_signature);
       fflush(stdout);
       break;
     }
@@ -84,11 +100,9 @@ void recv_loop(int connected, sockaddr_in client_addr)
       case kVideoFrame:
       {
         // Retrieve the video frame data from the client.
-        if (!do_recv(connected, video_packet_size, video_payload))
+        if (!do_recv(connected, video_packet_size,
+                     video_payload, "video", client_addr))
         {
-          printf("Got disconnect from: (%s, %d)\n",
-                 inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-          fflush(stdout);
           disconnect_client = true;
           break;
         }
@@ -98,12 +112,10 @@ void recv_loop(int connected, sockaddr_in client_addr)
       }
       case kDepthData:
       {
-        // Retrieve the skeleton data from the client.
-        if (!do_recv(connected, depth_packet_size, depth_payload))
+        // Retrieve the depth data from the client.
+        if (!do_recv(connected, depth_packet_size,
+                     depth_payload, "depth", client_addr))
         {
-          printf("Got disconnect from: (%s, %d)\n",
-                 inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-          fflush(stdout);
           disconnect_client = true;
           break;
         }
@@ -114,11 +126,9 @@ void recv_loop(int connected, sockaddr_in client_addr)
       case kSkeletonData:
       {
         // Retrieve the skeleton data from the client.
-        if (!do_recv(connected, skeleton_packet_size, skeleton_payload))
+        if (!do_recv(connected, skeleton_packet_size,
+                     skeleton_payload, "skeleton", client_addr))
         {
-          printf("Got disconnect from: (%s, %d)\n",
-                 inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-          fflush(stdout);
           disconnect_client = true;
           break;
         }
@@ -128,8 +138,9 @@ void recv_loop(int connected, sockaddr_in client_addr)
       }
       default:
       {
-        printf("Got bad payload kind from: (%s, %d)\n",
-               inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+        printh(client_addr);
+        printf("Got bad payload kind: %d, disconnecting.\n",
+               frame_header.m_payloadKind);
         fflush(stdout);
         disconnect_client = true;
         break;
