@@ -102,14 +102,15 @@ int main()
     // The pid will be used to lookup shared memory for each payload kind.
     if (!recv_child)
     {
+      //close(sock);
       recv_loop(connected, client_addr);
     }
 
     // Spawn another child process to send packets for this connection.
     if (!fork())
     {
-      close(sock);
-      close(connected);
+      //close(sock);
+      //close(connected);
       sender(recv_child);
     }
 /*

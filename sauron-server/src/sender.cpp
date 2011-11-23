@@ -117,7 +117,6 @@ void sender(pid_t shmem_key)
 bool do_send(int connected, int send_size, unsigned char* send_buffer,
              const char* name, const sockaddr_in& client_addr)
 {
-  memset(send_buffer, 0, send_size);
   int packet_size = send_size;
   unsigned char* packet_buffer = send_buffer;
 
@@ -170,60 +169,69 @@ void send_loop(pid_t shmem_key, int connected, sockaddr_in client_addr)
   // Allocate local and shared memory for the video traffic
   int video_packet_size = sizeof(VideoData);
   unsigned char* video_payload = new unsigned char[video_packet_size+header_packet_size];
-  char* video_shaddr = 0;
+  unsigned char* video_shaddr = 0;
   int video_shfd = -1;
   shmem_size = video_packet_size+header_packet_size;
-  if(!open_memory_map(vid_shmem_name, shmem_size, (void**)&video_shaddr, &video_shfd) ||
-     shmem_size != video_packet_size+header_packet_size)
+  if(!open_memory_map(vid_shmem_name, shmem_size, (void**)&video_shaddr, &video_shfd)
+     //|| shmem_size != video_packet_size+header_packet_size
+    )
   {
     printh(client_addr);
-    printf("Error opening shared memory object: '%s'", vid_shmem_name);
+    printf("Error opening shared memory object: '%s'\n", vid_shmem_name);
     fflush(stdout);
     disconnect_client = true;
   }
   // Allocate local and shared memory for the depth traffic
   int depth_packet_size = sizeof(DepthData);
   unsigned char* depth_payload = new unsigned char[depth_packet_size+header_packet_size];
-  char* depth_shaddr = 0;
+  unsigned char* depth_shaddr = 0;
   int depth_shfd = -1;
   shmem_size = depth_packet_size+header_packet_size;
-  if(!open_memory_map(depth_shmem_name, shmem_size, (void**)&depth_shaddr, &depth_shfd) ||
-     shmem_size != depth_packet_size+header_packet_size)
+  if(!open_memory_map(depth_shmem_name, shmem_size, (void**)&depth_shaddr, &depth_shfd)
+     //|| shmem_size != depth_packet_size+header_packet_size
+    )
   {
     printh(client_addr);
-    printf("Error opening shared memory object: '%s'", depth_shmem_name);
+    printf("Error opening shared memory object: '%s'\n", depth_shmem_name);
     fflush(stdout);
     disconnect_client = true;
   }
   // Allocate local and shared memory for the skeleton traffic
   int skeleton_packet_size = sizeof(SkeletalData);
   unsigned char* skele_payload = new unsigned char[skeleton_packet_size+header_packet_size];
-  char* skele_shaddr = 0;
+  unsigned char* skele_shaddr = 0;
   int skele_shfd = -1;
   shmem_size = skeleton_packet_size+header_packet_size;
-  if(!open_memory_map(skele_shmem_name, shmem_size, (void**)&skele_shaddr, &skele_shfd) ||
-     shmem_size != skeleton_packet_size+header_packet_size)
+  if(!open_memory_map(skele_shmem_name, shmem_size, (void**)&skele_shaddr, &skele_shfd)
+     //|| shmem_size != skeleton_packet_size+header_packet_size
+    )
   {
     printh(client_addr);
-    printf("Error opening shared memory object: '%s'", skele_shmem_name);
+    printf("Error opening shared memory object: '%s'\n", skele_shmem_name);
     fflush(stdout);
     disconnect_client = true;
   }
 
+  printh(client_addr);
+  printf("Initialized local resources for streaming.\n");
+  
   unsigned int video_prev_timestamp = 0;
   unsigned int depth_prev_timestamp = 0;
   unsigned int skele_prev_timestamp = 0;
 
   while(!disconnect_client)
   {
+    /*
     // Build a header for the streaming viewer
     SauronFrameHeader video_header;
     memcpy(&video_header, video_shaddr, header_packet_size);
 
     // Check for data validity and duplicate frames
     if (video_header.m_signature == 'SRN1' &&
+        video_header.m_payloadKind == kVideoFrame &&
         video_header.m_clientTimestamp != video_prev_timestamp)
     {
+      video_prev_timestamp = video_header.m_clientTimestamp;
       video_header.DeSerialize(video_payload);
       VideoData video_data;
       memcpy(&video_data, video_shaddr+header_packet_size, sizeof(video_data));
@@ -235,6 +243,12 @@ void send_loop(pid_t shmem_key, int connected, sockaddr_in client_addr)
         break;
       }
     }
+    else
+    {
+      printh(client_addr);
+      printf("Video data shared memory in an invalid format.\n");
+      break;
+    }
 
     // Build a header for the streaming viewer
     SauronFrameHeader depth_header;
@@ -242,8 +256,10 @@ void send_loop(pid_t shmem_key, int connected, sockaddr_in client_addr)
 
     // Check for data validity and duplicate frames
     if (depth_header.m_signature == 'SRN1' &&
+        depth_header.m_payloadKind == kDepthData &&
         depth_header.m_clientTimestamp != depth_prev_timestamp)
     {
+      depth_prev_timestamp = depth_header.m_clientTimestamp;
       depth_header.DeSerialize(video_payload);
       DepthData depth_data;
       memcpy(&depth_data, depth_shaddr+header_packet_size, sizeof(depth_data));
@@ -255,25 +271,41 @@ void send_loop(pid_t shmem_key, int connected, sockaddr_in client_addr)
         break;
       }
     }
-
+    else
+    {
+      printh(client_addr);
+      printf("Depth data shared memory in an invalid format.\n");
+      break;
+    }
+    */
     // Build a header for the streaming viewer
     SauronFrameHeader skele_header;
     memcpy(&skele_header, skele_shaddr, header_packet_size);
 
     // Check for data validity and duplicate frames
     if (skele_header.m_signature == 'SRN1' &&
-        skele_header.m_clientTimestamp != skele_prev_timestamp)
+        skele_header.m_payloadKind == kSkeletonData)
     {
-      skele_header.DeSerialize(skele_payload);
-      SkeletalData skele_data;
-      memcpy(&skele_data, skele_shaddr+header_packet_size, sizeof(skele_data));
-      skele_data.DeSerialize(skele_payload+header_packet_size);
-
-      if (!do_send(connected, skeleton_packet_size+header_packet_size,
-                   skele_payload, "skeleton", client_addr))
+      if (skele_header.m_clientTimestamp != skele_prev_timestamp)
       {
-        break;
+        skele_prev_timestamp = skele_header.m_clientTimestamp;
+        skele_header.Serialize(skele_payload);
+        SkeletalData skele_data;
+        memcpy(&skele_data, skele_shaddr+header_packet_size, sizeof(skele_data));
+        skele_data.Serialize(skele_payload+header_packet_size);
+        
+        if (!do_send(connected, skeleton_packet_size+header_packet_size,
+                     skele_payload, "skeleton", client_addr))
+        {
+          break;
+        }
       }
+    }
+    else
+    {
+      printh(client_addr);
+      printf("Skeleton data shared memory in an invalid format.\n");
+      break;
     }
 
   } // while(!disconnect_client)
@@ -287,9 +319,9 @@ void send_loop(pid_t shmem_key, int connected, sockaddr_in client_addr)
   delete[] video_payload;
   delete[] depth_payload;
   delete[] skele_payload;
-  close(connected);
   printh(client_addr);
   printf("Disconnected client and cleaned up local resources.\n");
   fflush(stdout);
+  close(connected);
   exit(0);
 }

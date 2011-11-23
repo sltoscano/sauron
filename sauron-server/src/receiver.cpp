@@ -81,36 +81,36 @@ void recv_loop(int connected, sockaddr_in client_addr)
   // Allocate local and shared memory for the video traffic
   int video_packet_size = sizeof(VideoData);
   unsigned char* video_payload = new unsigned char[video_packet_size];
-  char* video_shaddr = 0;
+  unsigned char* video_shaddr = 0;
   int video_shfd = -1;
   if(!create_memory_map(vid_shmem_name, video_packet_size+header_packet_size, (void**)&video_shaddr, &video_shfd))
   {
     printh(client_addr);
-    printf("Error creating shared memory object: '%s'", vid_shmem_name);
+    printf("Error creating shared memory object: '%s'\n", vid_shmem_name);
     fflush(stdout);
     disconnect_client = true;
   }
   // Allocate local and shared memory for the depth traffic
   int depth_packet_size = sizeof(DepthData);
   unsigned char* depth_payload = new unsigned char[depth_packet_size];
-  char* depth_shaddr = 0;
+  unsigned char* depth_shaddr = 0;
   int depth_shfd = -1;
   if(!create_memory_map(depth_shmem_name, depth_packet_size+header_packet_size, (void**)&depth_shaddr, &depth_shfd))
   {
     printh(client_addr);
-    printf("Error creating shared memory object: '%s'", depth_shmem_name);
+    printf("Error creating shared memory object: '%s'\n", depth_shmem_name);
     fflush(stdout);
     disconnect_client = true;
   }
   // Allocate local and shared memory for the skeleton traffic
   int skeleton_packet_size = sizeof(SkeletalData);
   unsigned char* skeleton_payload = new unsigned char[skeleton_packet_size];
-  char* skele_shaddr = 0;
+  unsigned char* skele_shaddr = 0;
   int skele_shfd = -1;
   if(!create_memory_map(skele_shmem_name, skeleton_packet_size+header_packet_size, (void**)&skele_shaddr, &skele_shfd))
   {
     printh(client_addr);
-    printf("Error creating shared memory object: '%s'", skele_shmem_name);
+    printf("Error creating shared memory object: '%s'\n", skele_shmem_name);
     fflush(stdout);
     disconnect_client = true;
   }
