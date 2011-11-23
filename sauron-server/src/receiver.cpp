@@ -14,11 +14,13 @@
 
 #include "../../sauron-protocol/protocol.h"
 #include "receiver.h"
+#include "shmem.h"
+
 
 // Print a client header 
-void printh(const sockaddr_in& client_addr)
+static void printh(const sockaddr_in& client_addr)
 {
-  printf("\t(%s, %d) ",
+  printf("\tcamera_client(%s, %d) ",
          inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 }
 
@@ -63,19 +65,58 @@ bool do_recv(int connected, int recv_size, unsigned char* recv_buffer,
 
 void recv_loop(int connected, sockaddr_in client_addr)
 {
+  pid_t shmem_key = getpid();
+  bool disconnect_client = false;
+
   int header_packet_size = sizeof(SauronFrameHeader);
   unsigned char* header_packet = new unsigned char[header_packet_size];
+
+  char vid_shmem_name[20] = "";
+  sprintf(vid_shmem_name, "SRN_%d_%d", kVideoFrame, shmem_key);
+  char depth_shmem_name[20] = "";
+  sprintf(depth_shmem_name, "SRN_%d_%d", kDepthData, shmem_key);
+  char skele_shmem_name[20] = "";
+  sprintf(skele_shmem_name, "SRN_%d_%d", kSkeletonData, shmem_key);
+  
+  // Allocate local and shared memory for the video traffic
   int video_packet_size = sizeof(VideoData);
   unsigned char* video_payload = new unsigned char[video_packet_size];
+  void* video_shaddr = 0;
+  int video_shfd = -1;
+  if(!create_memory_map(vid_shmem_name, video_packet_size, &video_shaddr, &video_shfd))
+  {
+    printh(client_addr);
+    printf("Error creating shared memory object: '%s'", vid_shmem_name);
+    fflush(stdout);
+    disconnect_client = true;
+  }
+  // Allocate local and shared memory for the depth traffic
   int depth_packet_size = sizeof(DepthData);
   unsigned char* depth_payload = new unsigned char[depth_packet_size];
+  void* depth_shaddr = 0;
+  int depth_shfd = -1;
+  if(!create_memory_map(depth_shmem_name, depth_packet_size, &depth_shaddr, &depth_shfd))
+  {
+    printh(client_addr);
+    printf("Error creating shared memory object: '%s'", depth_shmem_name);
+    fflush(stdout);
+    disconnect_client = true;
+  }
+  // Allocate local and shared memory for the skeleton traffic
   int skeleton_packet_size = sizeof(SkeletalData);
   unsigned char* skeleton_payload = new unsigned char[skeleton_packet_size];
-
-  while(1)
+  void* skele_shaddr = 0;
+  int skele_shfd = -1;
+  if(!create_memory_map(skele_shmem_name, skeleton_packet_size, &skele_shaddr, &skele_shfd))
   {
-    bool disconnect_client = false;
+    printh(client_addr);
+    printf("Error creating shared memory object: '%s'", skele_shmem_name);
+    fflush(stdout);
+    disconnect_client = true;
+  }
 
+  while(!disconnect_client)
+  {
     // Retrieve the header from the client.
     if (!do_recv(connected, header_packet_size,
                  header_packet, "header", client_addr))
@@ -108,6 +149,7 @@ void recv_loop(int connected, sockaddr_in client_addr)
         }
         VideoData video_data;
         video_data.DeSerialize(video_payload);
+        memcpy(video_shaddr, &video_data, sizeof(video_data));
         break;
       }
       case kDepthData:
@@ -121,6 +163,7 @@ void recv_loop(int connected, sockaddr_in client_addr)
         }
         DepthData depth_data;
         depth_data.DeSerialize(depth_payload);
+        memcpy(depth_shaddr, &depth_data, sizeof(depth_data));
         break;
       }
       case kSkeletonData:
@@ -134,6 +177,7 @@ void recv_loop(int connected, sockaddr_in client_addr)
         }
         SkeletalData skeleton_data;
         skeleton_data.DeSerialize(skeleton_payload);
+        memcpy(skele_shaddr, &skeleton_data, sizeof(skeleton_data));
         break;
       }
       default:
@@ -146,17 +190,21 @@ void recv_loop(int connected, sockaddr_in client_addr)
         break;
       }
     }
+  } // while(!disconnect_client)
 
-    if (disconnect_client)
-    {
-      break;
-    }
-  } // while(1)
-  
+  // Cleanup shared and local memory.
+  // Do not shutdown a server when clients are connected or shmem objects will leak!
+  // TODO: Add a CTRL-C handler for last resort cleanup.
+  destroy_memory_map(vid_shmem_name, video_packet_size, video_shaddr, video_shfd);
+  destroy_memory_map(depth_shmem_name, depth_packet_size, depth_shaddr, depth_shfd);
+  destroy_memory_map(skele_shmem_name, skeleton_packet_size, skele_shaddr, skele_shfd);
   delete[] header_packet;
   delete[] video_payload;
   delete[] depth_payload;
   delete[] skeleton_payload;
   close(connected);
+  printh(client_addr);
+  printf("Disconnected client and cleaned up local resources.\n");
+  fflush(stdout);
   exit(0);
 }

@@ -8,6 +8,12 @@
 
 /* Begin PBXFileReference section */
 		802D699A147A014500DAAA55 /* server.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = server.cpp; path = ../src/server.cpp; sourceTree = "<group>"; };
+		80746AC7147C950300B48B98 /* archiver.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = archiver.cpp; path = ../src/archiver.cpp; sourceTree = "<group>"; };
+		80746AC8147C950300B48B98 /* archiver.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = archiver.h; path = ../src/archiver.h; sourceTree = "<group>"; };
+		80746AC9147C950300B48B98 /* sender.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = sender.cpp; path = ../src/sender.cpp; sourceTree = "<group>"; };
+		80746ACA147C950300B48B98 /* sender.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = sender.h; path = ../src/sender.h; sourceTree = "<group>"; };
+		80746ACC147C998600B48B98 /* shmem.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = shmem.cpp; path = ../src/shmem.cpp; sourceTree = "<group>"; };
+		80746ACD147C998600B48B98 /* shmem.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = shmem.h; path = ../src/shmem.h; sourceTree = "<group>"; };
 		80F5F63E147B796D00668F39 /* protocol.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = protocol.cpp; sourceTree = "<group>"; };
 		80F5F63F147B796D00668F39 /* protocol.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = protocol.h; sourceTree = "<group>"; };
 		80F5F640147B796D00668F39 /* transport.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = transport.cpp; sourceTree = "<group>"; };
@@ -20,10 +26,16 @@
 		80E9C5371479F316004E6702 = {
 			isa = PBXGroup;
 			children = (
+				80746AC7147C950300B48B98 /* archiver.cpp */,
+				80746AC8147C950300B48B98 /* archiver.h */,
+				80746AC9147C950300B48B98 /* sender.cpp */,
+				80746ACA147C950300B48B98 /* sender.h */,
 				80F5F643147B9B5F00668F39 /* receiver.cpp */,
 				80F5F644147B9B5F00668F39 /* receiver.h */,
 				80F5F63D147B796D00668F39 /* sauron-protocol */,
 				802D699A147A014500DAAA55 /* server.cpp */,
+				80746ACC147C998600B48B98 /* shmem.cpp */,
+				80746ACD147C998600B48B98 /* shmem.h */,
 			);
 			sourceTree = "<group>";
 		};
