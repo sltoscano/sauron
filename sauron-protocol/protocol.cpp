@@ -24,13 +24,16 @@ void VideoData::DeSerialize(unsigned char* buffer)
 {
 }
 
+char SkeletalData::Format[] = "ll";
+
 int SkeletalData::Serialize(unsigned char* buffer)
 {
   int size = 0;
   int totalSize = 0;
   for (int i=0; i < SRN_MAX_JOINTS; ++i)
   {
-    size = pack(buffer, "ll", m_joints[i].x, m_joints[i].y);
+    size = pack(buffer, SkeletalData::Format,
+                m_joints[i].x, m_joints[i].y);
     buffer += size;
     totalSize += size;
   }
@@ -41,16 +44,18 @@ void SkeletalData::DeSerialize(unsigned char* buffer)
 {
   for (int i=0; i < SRN_MAX_JOINTS; ++i)
   {
-    unpack(buffer, "ll",
+    unpack(buffer, SkeletalData::Format,
       &m_joints[i].x,
       &m_joints[i].y);
     buffer += 8;
   }
 }
 
+char SauronFrameHeader::Format[] = "llllllL";
+
 int SauronFrameHeader::Serialize(unsigned char* buffer)
 {
-  return pack(buffer, "llllllL",
+  return pack(buffer, SauronFrameHeader::Format,
     m_signature,
     m_headerSize,
     m_payloadSize,
@@ -62,7 +67,7 @@ int SauronFrameHeader::Serialize(unsigned char* buffer)
 
 void SauronFrameHeader::DeSerialize(unsigned char* buffer)
 {
-  unpack(buffer, "llllllL",
+  unpack(buffer, SauronFrameHeader::Format,
     &m_signature,
     &m_headerSize,
     &m_payloadSize,

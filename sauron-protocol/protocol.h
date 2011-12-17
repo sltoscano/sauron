@@ -51,6 +51,8 @@ public:
   };
   Point m_joints[SRN_MAX_JOINTS];
 
+  static char Format[];
+
   int Serialize(unsigned char* buffer);
   void DeSerialize(unsigned char* buffer);
 };
@@ -84,6 +86,8 @@ public:
   int m_cameraId;
   int m_actorId;
   unsigned int m_clientTimestamp;
+
+  static char Format[];
 
   int Serialize(unsigned char* buffer);
   void DeSerialize(unsigned char* buffer);
