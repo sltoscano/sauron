@@ -20,7 +20,7 @@
 #include <errno.h>
 
 
-bool create_memory_map(const char* shared_name, __int64_t sizeBytes, void** addr, int* pfd)
+bool create_memory_map(const char* shared_name, int64_t sizeBytes, void** addr, int* pfd)
 {
 	shm_unlink(shared_name);
 	
@@ -42,7 +42,7 @@ bool create_memory_map(const char* shared_name, __int64_t sizeBytes, void** addr
 	return true;
 }
 
-bool destroy_memory_map(const char* shared_name, __int64_t sizeBytes, void* addr, int fd)
+bool destroy_memory_map(const char* shared_name, int64_t sizeBytes, void* addr, int fd)
 {
 	if (munmap(addr, sizeBytes) == -1)
 	{
@@ -65,7 +65,7 @@ bool destroy_memory_map(const char* shared_name, __int64_t sizeBytes, void* addr
 	return true;
 }
 
-bool open_memory_map(const char* shared_name, __int64_t& sizeBytes, void** addr, int* pfd)
+bool open_memory_map(const char* shared_name, int64_t& sizeBytes, void** addr, int* pfd)
 {
 	*pfd = shm_open(shared_name, O_EXCL|O_CREAT, S_IRWXG|S_IRWXU|S_IRWXO);
 	if (*pfd == -1 && errno == EEXIST)
@@ -117,7 +117,7 @@ bool open_memory_map(const char* shared_name, __int64_t& sizeBytes, void** addr,
 	return true;
 }
 
-bool close_memory_map(__int64_t sizeBytes, void* addr, int fd)
+bool close_memory_map(int64_t sizeBytes, void* addr, int fd)
 {
 	struct stat st;
 	fstat(fd, &st);

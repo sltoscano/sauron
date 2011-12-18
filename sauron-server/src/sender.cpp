@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <_types.h>
+#include <linux/types.h>
 #include <unistd.h>
 
 #include "../../sauron-protocol/protocol.h"
@@ -54,7 +54,12 @@ void sender(pid_t shmem_key)
 
   sockaddr_in server_addr;
   server_addr.sin_family = AF_INET;
-  server_addr.sin_port = htons(shmem_key);
+  // Constrain the port to 10000 - 11000 range
+  // TODO: Check for duplicates when there are
+  // multiple viewers connected.
+  //int port = (shmem_key % 1000) + 10000;
+  int port = 10000; // handle only one sender for now
+  server_addr.sin_port = htons(port);
   server_addr.sin_addr.s_addr = INADDR_ANY;
   bzero(&server_addr.sin_zero, 8);
 
@@ -81,7 +86,7 @@ void sender(pid_t shmem_key)
     exit(1);
   }
 
-  printf("Sauron(sender:%d) waiting for client connections\n", shmem_key);
+  printf("Sauron(sender:%d) waiting for client connections\n", port);
   fflush(stdout);
 
   sockaddr_in client_addr;
@@ -98,7 +103,7 @@ void sender(pid_t shmem_key)
     }
 
     printf("Sauron(sender:%d) got a connection from: (%s, %d)\n",
-           shmem_key, inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+           port, inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
     
     fflush(stdout);
 
