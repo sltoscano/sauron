@@ -22,14 +22,18 @@
 #include "SkeletalViewer.h"
 #include "resource.h"
 
+
 // Global Variables:
 CSkeletalViewerApp	g_CSkeletalViewerApp;	// Application class
 HINSTANCE			g_hInst;				// current instance
 HWND				g_hWndApp;				// Windows Handle to main application
 TCHAR				g_szAppTitle[256];		// Application title
 
+// Queue for sending data to the network thread.
+SkeletalDataQueue g_skeletalData;
 
-
+// Network transport.
+NetworkClient g_client;
 
 int APIENTRY _tWinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPTSTR lpCmdLine,int nCmdShow)
 {
@@ -84,6 +88,18 @@ LONG CALLBACK CSkeletalViewerApp::WndProc(HWND hWnd, UINT message, WPARAM wParam
 			{
 			LOGFONT lf;
 
+			// Init the network
+			//g_client.NetworkStartup("192.168.1.50", 10394);
+			// Local laptop
+			//g_client.NetworkStartup("192.168.1.10", 7779);
+			// Amazon AWS instance
+			g_client.NetworkStartup("50.18.156.246", 10000);
+			g_CSkeletalViewerApp.m_networkClient=&g_client;
+
+			// Init the transport queue
+			g_skeletalData.Initialize();
+			g_CSkeletalViewerApp.m_networkQueue=&g_skeletalData;
+
 			// Clean state the class
 			g_CSkeletalViewerApp.Nui_Zero();
 
@@ -98,6 +114,12 @@ LONG CALLBACK CSkeletalViewerApp::WndProc(HWND hWnd, UINT message, WPARAM wParam
 			lf.lfHeight*=4;
 			g_CSkeletalViewerApp.m_hFontFPS=CreateFontIndirect(&lf);
 			SendDlgItemMessage(hWnd,IDC_FPS,WM_SETFONT,(WPARAM) g_CSkeletalViewerApp.m_hFontFPS,0);
+
+			// Set the font for Action Detected
+			GetObject((HFONT) GetStockObject(DEFAULT_GUI_FONT),sizeof(lf),&lf);
+			lf.lfHeight*=2;
+			g_CSkeletalViewerApp.m_hFontActionDetected=CreateFontIndirect(&lf);
+			SendDlgItemMessage(hWnd,IDC_ACTION,WM_SETFONT,(WPARAM) g_CSkeletalViewerApp.m_hFontActionDetected,0);
 			}
 			break;
 
@@ -112,9 +134,12 @@ LONG CALLBACK CSkeletalViewerApp::WndProc(HWND hWnd, UINT message, WPARAM wParam
 
 			// Other cleanup
 			DeleteObject(g_CSkeletalViewerApp.m_hFontFPS);
+      DeleteObject(g_CSkeletalViewerApp.m_hFontActionDetected);
 
 			// Quit the main message pump
 			PostQuitMessage(0);
+
+			g_client.NetworkShutdown();
 			break;
 	}
 	return (FALSE);

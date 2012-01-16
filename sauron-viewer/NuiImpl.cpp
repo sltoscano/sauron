@@ -16,6 +16,9 @@
 #include "resource.h"
 #include <mmsystem.h>
 
+#include "network_client.h"
+
+
 static const COLORREF g_JointColorTable[NUI_SKELETON_POSITION_COUNT] = 
 {
     RGB(169, 176, 155), // NUI_SKELETON_POSITION_HIP_CENTER
@@ -52,6 +55,8 @@ void CSkeletalViewerApp::Nui_Zero()
     m_pVideoStreamHandle = NULL;
     m_hThNuiProcess=NULL;
     m_hEvNuiProcessStop=NULL;
+    m_hThNetworkProcess=NULL;
+    m_hEvNetworkProcessStop=NULL;
     ZeroMemory(m_Pen,sizeof(m_Pen));
     m_SkeletonDC = NULL;
     m_SkeletonBMP = NULL;
@@ -112,7 +117,7 @@ HRESULT CSkeletalViewerApp::Nui_Init()
         MessageBoxResource( m_hWnd,IDS_ERROR_D3DVIDEOTYPE,MB_OK | MB_ICONHAND);
         return hr;
     }
-    
+/*
     hr = NuiInitialize( 
         NUI_INITIALIZE_FLAG_USES_DEPTH_AND_PLAYER_INDEX | NUI_INITIALIZE_FLAG_USES_SKELETON | NUI_INITIALIZE_FLAG_USES_COLOR);
     if( FAILED( hr ) )
@@ -153,10 +158,13 @@ HRESULT CSkeletalViewerApp::Nui_Init()
         MessageBoxResource(m_hWnd,IDS_ERROR_DEPTHSTREAM,MB_OK | MB_ICONHAND);
         return hr;
     }
-
+*/
     // Start the Nui processing thread
     m_hEvNuiProcessStop=CreateEvent(NULL,FALSE,FALSE,NULL);
     m_hThNuiProcess=CreateThread(NULL,0,Nui_ProcessThread,this,0,NULL);
+
+    m_hEvNetworkProcessStop=CreateEvent(NULL,FALSE,FALSE,NULL);
+    m_hThNetworkProcess=CreateThread(NULL,0,NetworkThread,this,0,NULL);
 
     return hr;
 }
@@ -195,7 +203,22 @@ void CSkeletalViewerApp::Nui_UnInit( )
         CloseHandle(m_hEvNuiProcessStop);
     }
 
-    NuiShutdown( );
+    // Stop the network processing thread
+    if(m_hEvNetworkProcessStop!=NULL)
+    {
+        // Signal the thread
+        SetEvent(m_hEvNetworkProcessStop);
+
+        // Wait for thread to stop
+        if(m_hThNetworkProcess!=NULL)
+        {
+            WaitForSingleObject(m_hThNetworkProcess,INFINITE);
+            CloseHandle(m_hThNetworkProcess);
+        }
+        CloseHandle(m_hEvNetworkProcessStop);
+    }
+
+//    NuiShutdown( );
     if( m_hNextSkeletonEvent && ( m_hNextSkeletonEvent != INVALID_HANDLE_VALUE ) )
     {
         CloseHandle( m_hNextSkeletonEvent );
@@ -267,6 +290,11 @@ DWORD WINAPI CSkeletalViewerApp::Nui_ProcessThread(LPVOID pParam)
                 pthis->m_bScreenBlanked = true;
             }
         }
+        bool drawSkele = true;
+        if( dt > 33 )
+        {
+          drawSkele = true;
+        }
 
         // Process signal events
         switch(nEventIdx)
@@ -281,9 +309,70 @@ DWORD WINAPI CSkeletalViewerApp::Nui_ProcessThread(LPVOID pParam)
                 break;
 
             case 3:
-                pthis->Nui_GotSkeletonAlert( );
+                if (drawSkele)
+                {
+                  pthis->Nui_GotSkeletonAlert( );
+                  pthis->m_FramesTotal++;
+                }
                 break;
         }
+    }
+
+    return (0);
+}
+
+DWORD WINAPI CSkeletalViewerApp::NetworkThread(LPVOID pParam)
+{
+    CSkeletalViewerApp *pthis=(CSkeletalViewerApp *) pParam;
+    HANDLE                hEvents[1];
+    int                    nEventIdx;
+
+    // Configure events to be listened on
+    hEvents[0]=pthis->m_hEvNetworkProcessStop;
+
+    // Main thread loop
+    while(1)
+    {
+        // Wait for an event to be signaled
+        nEventIdx=WaitForMultipleObjects(sizeof(hEvents)/sizeof(hEvents[0]),hEvents,FALSE,100);
+
+        // If the stop event, stop looping and exit
+        if(nEventIdx==0)
+            break;
+
+        SauronFrameHeader frameHeader;
+        pthis->m_networkClient->NetworkBlockingRecv(frameHeader);
+
+        if (frameHeader.m_signature == 'SRN1')
+        {
+          switch(frameHeader.m_payloadKind)
+          {
+          case kVideoFrame:
+            break;
+          case kDepthData:
+            break;
+          case kSkeletonData:
+            {
+              pthis->g_onePacket.header = frameHeader;
+              pthis->m_networkClient->NetworkBlockingRecv(pthis->g_onePacket.data);
+              /*
+              // Send the packet to the queue for network transmission
+              {
+                Lock cs(&pthis->m_queueLock);
+                pthis->m_networkQueue->Insert(packet);
+              }
+              */
+              SetEvent(pthis->m_hNextSkeletonEvent);
+            }
+            break;
+          default:
+            break;
+          }
+        }
+
+        // TODO: If connection lost try to reconnect, and discard packets since
+        // we can't send them (possibly save frames locally if data is critical).
+        // Drop the packet by setting transmitted to true
     }
 
     return (0);
@@ -293,6 +382,8 @@ void CSkeletalViewerApp::Nui_GotVideoAlert( )
 {
     const NUI_IMAGE_FRAME * pImageFrame = NULL;
 
+    // Get from network packet
+    /*
     HRESULT hr = NuiImageStreamGetNextFrame(
         m_pVideoStreamHandle,
         0,
@@ -301,6 +392,7 @@ void CSkeletalViewerApp::Nui_GotVideoAlert( )
     {
         return;
     }
+    */
 
     NuiImageBuffer * pTexture = pImageFrame->pFrameTexture;
     KINECT_LOCKED_RECT LockedRect;
@@ -317,7 +409,7 @@ void CSkeletalViewerApp::Nui_GotVideoAlert( )
         OutputDebugString( L"Buffer length of received texture is bogus\r\n" );
     }
 
-    NuiImageStreamReleaseFrame( m_pVideoStreamHandle, pImageFrame );
+    //NuiImageStreamReleaseFrame( m_pVideoStreamHandle, pImageFrame );
 }
 
 
@@ -325,6 +417,7 @@ void CSkeletalViewerApp::Nui_GotDepthAlert( )
 {
     const NUI_IMAGE_FRAME * pImageFrame = NULL;
 
+    /*
     HRESULT hr = NuiImageStreamGetNextFrame(
         m_pDepthStreamHandle,
         0,
@@ -334,6 +427,7 @@ void CSkeletalViewerApp::Nui_GotDepthAlert( )
     {
         return;
     }
+    */
 
     NuiImageBuffer * pTexture = pImageFrame->pFrameTexture;
     KINECT_LOCKED_RECT LockedRect;
@@ -363,7 +457,7 @@ void CSkeletalViewerApp::Nui_GotDepthAlert( )
         OutputDebugString( L"Buffer length of received texture is bogus\r\n" );
     }
 
-    NuiImageStreamReleaseFrame( m_pDepthStreamHandle, pImageFrame );
+    //NuiImageStreamReleaseFrame( m_pDepthStreamHandle, pImageFrame );
 }
 
 
@@ -397,7 +491,8 @@ void CSkeletalViewerApp::Nui_DrawSkeletonSegment( NUI_SKELETON_DATA * pSkel, int
     va_end(vl);
 }
 
-void CSkeletalViewerApp::Nui_DrawSkeleton( bool bBlank, NUI_SKELETON_DATA * pSkel, HWND hWnd, int WhichSkeletonColor )
+//void CSkeletalViewerApp::Nui_DrawSkeleton( bool bBlank, NUI_SKELETON_DATA * pSkel, HWND hWnd, int WhichSkeletonColor )
+void CSkeletalViewerApp::Nui_DrawSkeleton( bool bBlank, SkeletalData * pSkel, HWND hWnd, int WhichSkeletonColor )
 {
     HGDIOBJ hOldObj = SelectObject(m_SkeletonDC,m_Pen[WhichSkeletonColor % m_PensTotal]);
     
@@ -421,25 +516,51 @@ void CSkeletalViewerApp::Nui_DrawSkeleton( bool bBlank, NUI_SKELETON_DATA * pSke
         PatBlt( m_SkeletonDC, 0, 0, width, height, BLACKNESS );
     }
 
-    int scaleX = width; //scaling up to image coordinates
-    int scaleY = height;
-    float fx=0,fy=0;
+    //int scaleX = width; //scaling up to image coordinates
+    //int scaleY = height;
+    //float fx=0,fy=0;
     int i;
     for (i = 0; i < NUI_SKELETON_POSITION_COUNT; i++)
     {
-        NuiTransformSkeletonToDepthImageF( pSkel->SkeletonPositions[i], &fx, &fy );
-        m_Points[i].x = (int) ( fx * scaleX + 0.5f );
-        m_Points[i].y = (int) ( fy * scaleY + 0.5f );
+        //NuiTransformSkeletonToDepthImageF( pSkel->SkeletonPositions[i], &fx, &fy );
+        m_Points[i].x = pSkel->m_joints[i].x;
+        m_Points[i].y = pSkel->m_joints[i].y;
     }
 
     SelectObject(m_SkeletonDC,m_Pen[WhichSkeletonColor%m_PensTotal]);
     
-    Nui_DrawSkeletonSegment(pSkel,4,NUI_SKELETON_POSITION_HIP_CENTER, NUI_SKELETON_POSITION_SPINE, NUI_SKELETON_POSITION_SHOULDER_CENTER, NUI_SKELETON_POSITION_HEAD);
-    Nui_DrawSkeletonSegment(pSkel,5,NUI_SKELETON_POSITION_SHOULDER_CENTER, NUI_SKELETON_POSITION_SHOULDER_LEFT, NUI_SKELETON_POSITION_ELBOW_LEFT, NUI_SKELETON_POSITION_WRIST_LEFT, NUI_SKELETON_POSITION_HAND_LEFT);
-    Nui_DrawSkeletonSegment(pSkel,5,NUI_SKELETON_POSITION_SHOULDER_CENTER, NUI_SKELETON_POSITION_SHOULDER_RIGHT, NUI_SKELETON_POSITION_ELBOW_RIGHT, NUI_SKELETON_POSITION_WRIST_RIGHT, NUI_SKELETON_POSITION_HAND_RIGHT);
-    Nui_DrawSkeletonSegment(pSkel,5,NUI_SKELETON_POSITION_HIP_CENTER, NUI_SKELETON_POSITION_HIP_LEFT, NUI_SKELETON_POSITION_KNEE_LEFT, NUI_SKELETON_POSITION_ANKLE_LEFT, NUI_SKELETON_POSITION_FOOT_LEFT);
-    Nui_DrawSkeletonSegment(pSkel,5,NUI_SKELETON_POSITION_HIP_CENTER, NUI_SKELETON_POSITION_HIP_RIGHT, NUI_SKELETON_POSITION_KNEE_RIGHT, NUI_SKELETON_POSITION_ANKLE_RIGHT, NUI_SKELETON_POSITION_FOOT_RIGHT);
-    
+    Nui_DrawSkeletonSegment(NULL,4,NUI_SKELETON_POSITION_HIP_CENTER, NUI_SKELETON_POSITION_SPINE, NUI_SKELETON_POSITION_SHOULDER_CENTER, NUI_SKELETON_POSITION_HEAD);
+    Nui_DrawSkeletonSegment(NULL,5,NUI_SKELETON_POSITION_SHOULDER_CENTER, NUI_SKELETON_POSITION_SHOULDER_LEFT, NUI_SKELETON_POSITION_ELBOW_LEFT, NUI_SKELETON_POSITION_WRIST_LEFT, NUI_SKELETON_POSITION_HAND_LEFT);
+    Nui_DrawSkeletonSegment(NULL,5,NUI_SKELETON_POSITION_SHOULDER_CENTER, NUI_SKELETON_POSITION_SHOULDER_RIGHT, NUI_SKELETON_POSITION_ELBOW_RIGHT, NUI_SKELETON_POSITION_WRIST_RIGHT, NUI_SKELETON_POSITION_HAND_RIGHT);
+    Nui_DrawSkeletonSegment(NULL,5,NUI_SKELETON_POSITION_HIP_CENTER, NUI_SKELETON_POSITION_HIP_LEFT, NUI_SKELETON_POSITION_KNEE_LEFT, NUI_SKELETON_POSITION_ANKLE_LEFT, NUI_SKELETON_POSITION_FOOT_LEFT);
+    Nui_DrawSkeletonSegment(NULL,5,NUI_SKELETON_POSITION_HIP_CENTER, NUI_SKELETON_POSITION_HIP_RIGHT, NUI_SKELETON_POSITION_KNEE_RIGHT, NUI_SKELETON_POSITION_ANKLE_RIGHT, NUI_SKELETON_POSITION_FOOT_RIGHT);
+
+    int posCloseToGround = 0;
+    for (i = 0; i < NUI_SKELETON_POSITION_COUNT ; i++)
+    {
+      if (((m_Points[NUI_SKELETON_POSITION_FOOT_LEFT].y - m_Points[i].y) < 50) &&
+        ((m_Points[NUI_SKELETON_POSITION_FOOT_RIGHT].y - m_Points[i].y) < 50))
+      {
+        posCloseToGround++;
+      }
+    }
+
+    // Detect "hands-up"
+    if ((m_Points[NUI_SKELETON_POSITION_HAND_LEFT].y < m_Points[NUI_SKELETON_POSITION_HEAD].y) &&
+      (m_Points[NUI_SKELETON_POSITION_HAND_RIGHT].y < m_Points[NUI_SKELETON_POSITION_HEAD].y))
+    {
+      SetDlgItemText( m_hWnd, IDC_ACTION, L"Hands Up" );
+    }
+    // Detect "fallen"
+    else if (posCloseToGround > NUI_SKELETON_POSITION_COUNT/2)
+    {
+      SetDlgItemText( m_hWnd, IDC_ACTION, L"Fallen Down" );
+    }
+    else
+    {
+      SetDlgItemText( m_hWnd, IDC_ACTION, L"" );
+    }
+
     // Draw the joints in a different color
     for (i = 0; i < NUI_SKELETON_POSITION_COUNT ; i++)
     {
@@ -479,8 +600,10 @@ void CSkeletalViewerApp::Nui_DoDoubleBuffer(HWND hWnd,HDC hDC)
 
 void CSkeletalViewerApp::Nui_GotSkeletonAlert( )
 {
+  /*
     NUI_SKELETON_FRAME SkeletonFrame;
 
+    // Get from network packet
     HRESULT hr = NuiSkeletonGetNextFrame( 0, &SkeletonFrame );
 
     bool bFoundSkeleton = true;
@@ -500,7 +623,7 @@ void CSkeletalViewerApp::Nui_GotSkeletonAlert( )
     }
 
     // smooth out the skeleton data
-    NuiTransformSmooth(&SkeletonFrame,NULL);
+    //NuiTransformSmooth(&SkeletonFrame,NULL);
 
     // we found a skeleton, re-start the timer
     m_bScreenBlanked = false;
@@ -517,10 +640,24 @@ void CSkeletalViewerApp::Nui_GotSkeletonAlert( )
             bBlank = false;
         }
     }
+    */
+  /*
+    SkeletalDataPacket packet;
+    {
+      Lock cs(&m_queueLock);
+      if (!m_networkQueue->IsEmpty())
+      {
+        packet = m_networkQueue->Remove();
+      }
+    }
+  */
+    if (g_onePacket.header.m_payloadKind == kSkeletonData)
+    {
+        Nui_DrawSkeleton( true, &g_onePacket.data, GetDlgItem( m_hWnd, IDC_SKELETALVIEW ), g_onePacket.header.m_actorId );
 
-    Nui_DoDoubleBuffer(GetDlgItem(m_hWnd,IDC_SKELETALVIEW), m_SkeletonDC);
+        Nui_DoDoubleBuffer(GetDlgItem(m_hWnd,IDC_SKELETALVIEW), m_SkeletonDC);
+    }
 }
-
 
 
 RGBQUAD CSkeletalViewerApp::Nui_ShortToQuad_Depth( USHORT s )

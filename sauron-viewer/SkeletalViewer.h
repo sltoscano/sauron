@@ -16,6 +16,10 @@
 #include "MSR_NuiApi.h"
 #include "DrawDevice.h"
 
+#include "critical_section.h"
+#include "network_client.h"
+#include "skeletal_data.h"
+
 #define SZ_APPDLG_WINDOW_CLASS        _T("SkeletalViewerAppDlgWndClass")
 
 class CSkeletalViewerApp
@@ -29,7 +33,7 @@ public:
     void                    Nui_Zero();
     void                    Nui_BlankSkeletonScreen( HWND hWnd );
     void                    Nui_DoDoubleBuffer(HWND hWnd,HDC hDC);
-    void                    Nui_DrawSkeleton( bool bBlank, NUI_SKELETON_DATA * pSkel, HWND hWnd, int WhichSkeletonColor );
+    void                    Nui_DrawSkeleton( bool bBlank, SkeletalData * pSkel, HWND hWnd, int WhichSkeletonColor );
     void                    Nui_DrawSkeletonSegment( NUI_SKELETON_DATA * pSkel, int numJoints, ... );
 
     RGBQUAD                 Nui_ShortToQuad_Depth( USHORT s );
@@ -40,7 +44,21 @@ public:
 
 private:
     static DWORD WINAPI     Nui_ProcessThread(LPVOID pParam);
+    static DWORD WINAPI     NetworkThread(LPVOID pParam);
 
+    // The one packet
+    SkeletalDataPacket g_onePacket;
+
+    // Network client
+    NetworkClient* m_networkClient;
+
+    // Network transmission queue
+    SkeletalDataQueue* m_networkQueue;
+    CSection m_queueLock;
+
+    // Thread to send items from the queue
+    HANDLE        m_hThNetworkProcess;
+    HANDLE        m_hEvNetworkProcessStop;
 
     // NUI and draw stuff
     DrawDevice    m_DrawDepth;
@@ -56,6 +74,7 @@ private:
     HANDLE        m_pDepthStreamHandle;
     HANDLE        m_pVideoStreamHandle;
     HFONT         m_hFontFPS;
+    HFONT         m_hFontActionDetected;
     HPEN          m_Pen[6];
     HDC           m_SkeletonDC;
     HBITMAP       m_SkeletonBMP;
