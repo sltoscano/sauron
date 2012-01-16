@@ -90,7 +90,10 @@ LONG CALLBACK CSkeletalViewerApp::WndProc(HWND hWnd, UINT message, WPARAM wParam
 
 			// Init the network
 			//g_client.NetworkStartup("www.trisourcesoftware.com", 6969);
-			g_client.NetworkStartup("192.168.1.10", 6969);
+			// Local laptop
+			//g_client.NetworkStartup("192.168.1.10", 6969);
+			// Amazon AWS instance
+			g_client.NetworkStartup("50.18.156.246", 6969);
 			g_CSkeletalViewerApp.m_networkClient=&g_client;
 
 			// Init the transport queue

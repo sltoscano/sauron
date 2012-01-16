@@ -29,11 +29,11 @@ public:
     void                    Nui_UnInit( );
     void                    Nui_GotDepthAlert( );
     void                    Nui_GotVideoAlert( );
-    void                    Nui_GotSkeletonAlert( );
+    void                    Nui_GotSkeletonAlert( bool queuePacket );
     void                    Nui_Zero();
     void                    Nui_BlankSkeletonScreen( HWND hWnd );
     void                    Nui_DoDoubleBuffer(HWND hWnd,HDC hDC);
-    void                    Nui_DrawSkeleton( bool bBlank, NUI_SKELETON_DATA * pSkel, HWND hWnd, int WhichSkeletonColor );
+    void                    Nui_DrawSkeleton( bool bBlank, NUI_SKELETON_DATA * pSkel, HWND hWnd, int WhichSkeletonColor, bool queuePacket );
     void                    Nui_DrawSkeletonSegment( NUI_SKELETON_DATA * pSkel, int numJoints, ... );
 
     RGBQUAD                 Nui_ShortToQuad_Depth( USHORT s );

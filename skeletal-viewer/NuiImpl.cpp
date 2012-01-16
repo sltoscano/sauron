@@ -252,6 +252,8 @@ DWORD WINAPI CSkeletalViewerApp::Nui_ProcessThread(LPVOID pParam)
     hEvents[2]=pthis->m_hNextVideoFrameEvent;
     hEvents[3]=pthis->m_hNextSkeletonEvent;
 
+    bool queuePacket = false;
+
     // Main thread loop
     while(1)
     {
@@ -291,6 +293,8 @@ DWORD WINAPI CSkeletalViewerApp::Nui_ProcessThread(LPVOID pParam)
             }
         }
 
+        queuePacket = false;
+
         // Process signal events
         switch(nEventIdx)
         {
@@ -304,7 +308,11 @@ DWORD WINAPI CSkeletalViewerApp::Nui_ProcessThread(LPVOID pParam)
                 break;
 
             case 3:
-                pthis->Nui_GotSkeletonAlert( );
+                if( dt > 33 )
+                {
+                  queuePacket = true;
+                }
+                pthis->Nui_GotSkeletonAlert(queuePacket);
                 break;
         }
 
@@ -371,12 +379,15 @@ DWORD WINAPI CSkeletalViewerApp::NetworkThread(LPVOID pParam)
                     }
                     else
                     {
-                      assert(false);
+                      //assert(false);
                     }
                 }
             }
             break;
         }
+        // TODO: If connection lost try to reconnect, and discard packets since
+        // we can't send them (possibly save frames locally if data is critical).
+        // Drop the packet by setting transmitted to true
     }
 
     return (0);
@@ -490,7 +501,7 @@ void CSkeletalViewerApp::Nui_DrawSkeletonSegment( NUI_SKELETON_DATA * pSkel, int
     va_end(vl);
 }
 
-void CSkeletalViewerApp::Nui_DrawSkeleton( bool bBlank, NUI_SKELETON_DATA * pSkel, HWND hWnd, int WhichSkeletonColor )
+void CSkeletalViewerApp::Nui_DrawSkeleton( bool bBlank, NUI_SKELETON_DATA * pSkel, HWND hWnd, int WhichSkeletonColor, bool queuePacket )
 {
     HGDIOBJ hOldObj = SelectObject(m_SkeletonDC,m_Pen[WhichSkeletonColor % m_PensTotal]);
     
@@ -534,6 +545,7 @@ void CSkeletalViewerApp::Nui_DrawSkeleton( bool bBlank, NUI_SKELETON_DATA * pSke
         packet.data.m_joints[i].y = m_Points[i].y = (int) ( fy * scaleY + 0.5f );
     }
     // Send the packet to the queue for network transmission
+    if (queuePacket)
     {
         Lock cs(&m_queueLock);
         m_networkQueue->Insert(packet);
@@ -584,7 +596,7 @@ void CSkeletalViewerApp::Nui_DoDoubleBuffer(HWND hWnd,HDC hDC)
 
 }
 
-void CSkeletalViewerApp::Nui_GotSkeletonAlert( )
+void CSkeletalViewerApp::Nui_GotSkeletonAlert(bool queuePacket)
 {
     NUI_SKELETON_FRAME SkeletonFrame;
 
@@ -620,7 +632,7 @@ void CSkeletalViewerApp::Nui_GotSkeletonAlert( )
     {
         if( SkeletonFrame.SkeletonData[i].eTrackingState == NUI_SKELETON_TRACKED )
         {
-            Nui_DrawSkeleton( bBlank, &SkeletonFrame.SkeletonData[i], GetDlgItem( m_hWnd, IDC_SKELETALVIEW ), i );
+            Nui_DrawSkeleton( bBlank, &SkeletonFrame.SkeletonData[i], GetDlgItem( m_hWnd, IDC_SKELETALVIEW ), i, queuePacket );
             bBlank = false;
         }
     }
