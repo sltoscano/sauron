@@ -16,7 +16,6 @@
 #include "resource.h"
 #include <mmsystem.h>
 
-//extern HANDLE g_shmFile;
 
 static const COLORREF g_JointColorTable[NUI_SKELETON_POSITION_COUNT] = 
 {
@@ -160,6 +159,10 @@ HRESULT CSkeletalViewerApp::Nui_Init()
     m_hEvNuiProcessStop=CreateEvent(NULL,FALSE,FALSE,NULL);
     m_hThNuiProcess=CreateThread(NULL,0,Nui_ProcessThread,this,0,NULL);
 
+    // Start the detector processing thread
+    m_hEvDetectorProcessStop=CreateEvent(NULL,FALSE,FALSE,NULL);
+    m_hThDetectorProcess=CreateThread(NULL,0,Detector_ProcessThread,this,0,NULL);
+
     return hr;
 }
 
@@ -180,6 +183,21 @@ void CSkeletalViewerApp::Nui_UnInit( )
         DeleteObject(m_Pen[4]);
         DeleteObject(m_Pen[5]);
         ZeroMemory(m_Pen,sizeof(m_Pen));
+    }
+
+    // Stop the detector processing thread
+    if(m_hEvDetectorProcessStop!=NULL)
+    {
+      // Signal the thread
+      SetEvent(m_hEvDetectorProcessStop);
+
+      // Wait for thread to stop
+      if(m_hThDetectorProcess!=NULL)
+      {
+        WaitForSingleObject(m_hThDetectorProcess,INFINITE);
+        CloseHandle(m_hThDetectorProcess);
+      }
+      CloseHandle(m_hEvDetectorProcessStop);
     }
 
     // Stop the Nui processing thread
@@ -289,6 +307,29 @@ DWORD WINAPI CSkeletalViewerApp::Nui_ProcessThread(LPVOID pParam)
     }
 
     return (0);
+}
+
+DWORD WINAPI CSkeletalViewerApp::Detector_ProcessThread(LPVOID pParam)
+{
+  CSkeletalViewerApp *pthis=(CSkeletalViewerApp *) pParam;
+  HANDLE                hEvents[1];
+  int                    nEventIdx;
+
+  // Configure events to be listened on
+  hEvents[0]=pthis->m_hEvDetectorProcessStop;
+
+  // Main thread loop
+  while(1)
+  {
+    // Wait for an event to be signaled
+    nEventIdx=WaitForMultipleObjects(sizeof(hEvents)/sizeof(hEvents[0]),hEvents,FALSE,100);
+
+    // If the stop event, stop looping and exit
+    if(nEventIdx==0)
+      break;
+  }
+
+  return 0;
 }
 
 void CSkeletalViewerApp::Nui_GotVideoAlert( )
@@ -435,26 +476,18 @@ void CSkeletalViewerApp::Nui_DrawSkeleton( bool bBlank, NUI_SKELETON_DATA * pSke
     }
 
     SelectObject(m_SkeletonDC,m_Pen[WhichSkeletonColor%m_PensTotal]);
-    
+
     Nui_DrawSkeletonSegment(pSkel,4,NUI_SKELETON_POSITION_HIP_CENTER, NUI_SKELETON_POSITION_SPINE, NUI_SKELETON_POSITION_SHOULDER_CENTER, NUI_SKELETON_POSITION_HEAD);
     Nui_DrawSkeletonSegment(pSkel,5,NUI_SKELETON_POSITION_SHOULDER_CENTER, NUI_SKELETON_POSITION_SHOULDER_LEFT, NUI_SKELETON_POSITION_ELBOW_LEFT, NUI_SKELETON_POSITION_WRIST_LEFT, NUI_SKELETON_POSITION_HAND_LEFT);
     Nui_DrawSkeletonSegment(pSkel,5,NUI_SKELETON_POSITION_SHOULDER_CENTER, NUI_SKELETON_POSITION_SHOULDER_RIGHT, NUI_SKELETON_POSITION_ELBOW_RIGHT, NUI_SKELETON_POSITION_WRIST_RIGHT, NUI_SKELETON_POSITION_HAND_RIGHT);
     Nui_DrawSkeletonSegment(pSkel,5,NUI_SKELETON_POSITION_HIP_CENTER, NUI_SKELETON_POSITION_HIP_LEFT, NUI_SKELETON_POSITION_KNEE_LEFT, NUI_SKELETON_POSITION_ANKLE_LEFT, NUI_SKELETON_POSITION_FOOT_LEFT);
     Nui_DrawSkeletonSegment(pSkel,5,NUI_SKELETON_POSITION_HIP_CENTER, NUI_SKELETON_POSITION_HIP_RIGHT, NUI_SKELETON_POSITION_KNEE_RIGHT, NUI_SKELETON_POSITION_ANKLE_RIGHT, NUI_SKELETON_POSITION_FOOT_RIGHT);
-    /*
-    long* shm = (long*) MapViewOfFile(g_shmFile, FILE_MAP_WRITE, 0, 0, 0);
-    shm[0] = m_Points[NUI_SKELETON_POSITION_HAND_LEFT].x;
-    shm[1] = m_Points[NUI_SKELETON_POSITION_HAND_LEFT].y;
-    shm[2] = m_Points[NUI_SKELETON_POSITION_HAND_RIGHT].x;
-    shm[3] = m_Points[NUI_SKELETON_POSITION_HAND_RIGHT].y;
-    UnmapViewOfFile(shm);
-    */
 
     // Detect "hands-up"
     if ((m_Points[NUI_SKELETON_POSITION_HAND_LEFT].y < m_Points[NUI_SKELETON_POSITION_HEAD].y) &&
         (m_Points[NUI_SKELETON_POSITION_HAND_RIGHT].y < m_Points[NUI_SKELETON_POSITION_HEAD].y))
     {
-        Beep(550, 50);
+        //Beep(550, 50);
     }
 
     int posCloseToGround = 0;
@@ -469,7 +502,7 @@ void CSkeletalViewerApp::Nui_DrawSkeleton( bool bBlank, NUI_SKELETON_DATA * pSke
 
     if (posCloseToGround > NUI_SKELETON_POSITION_COUNT/2)
     {
-        Beep(550, 50);
+        //Beep(550, 50);
     }
 
     // Draw the joints in a different color
@@ -546,6 +579,7 @@ void CSkeletalViewerApp::Nui_GotSkeletonAlert( )
         if( SkeletonFrame.SkeletonData[i].eTrackingState == NUI_SKELETON_TRACKED )
         {
             Nui_DrawSkeleton( bBlank, &SkeletonFrame.SkeletonData[i], GetDlgItem( m_hWnd, IDC_SKELETALVIEW ), i );
+            m_actorDetector.FindSkeletalLengths( &SkeletonFrame.SkeletonData[i], GetDlgItem( m_hWnd, IDC_SKELETALVIEW ), i );
             bBlank = false;
         }
     }

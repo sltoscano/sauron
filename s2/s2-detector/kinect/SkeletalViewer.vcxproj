@@ -88,6 +88,7 @@
     <None Include="SkeletalViewer.ico" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="actor_detector.h" />
     <ClInclude Include="DrawDevice.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="shmem.h" />
@@ -96,6 +97,7 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="actor_detector.cpp" />
     <ClCompile Include="DrawDevice.cpp" />
     <ClCompile Include="NuiImpl.cpp" />
     <ClCompile Include="SkeletalViewer.cpp" />

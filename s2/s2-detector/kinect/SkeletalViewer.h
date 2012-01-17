@@ -16,6 +16,8 @@
 #include "MSR_NuiApi.h"
 #include "DrawDevice.h"
 
+#include "actor_detector.h"
+
 #define SZ_APPDLG_WINDOW_CLASS        _T("SkeletalViewerAppDlgWndClass")
 
 class CSkeletalViewerApp
@@ -39,8 +41,10 @@ public:
     HWND m_hWnd;
 
 private:
-    static DWORD WINAPI     Nui_ProcessThread(LPVOID pParam);
+    Sauron::ActorDetector   m_actorDetector;
 
+    static DWORD WINAPI     Nui_ProcessThread(LPVOID pParam);
+    static DWORD WINAPI     Detector_ProcessThread(LPVOID pParam);
 
     // NUI and draw stuff
     DrawDevice    m_DrawDepth;
@@ -49,6 +53,10 @@ private:
     // thread handling
     HANDLE        m_hThNuiProcess;
     HANDLE        m_hEvNuiProcessStop;
+
+    // detector handling
+    HANDLE        m_hThDetectorProcess;
+    HANDLE        m_hEvDetectorProcessStop;
 
     HANDLE        m_hNextDepthFrameEvent;
     HANDLE        m_hNextVideoFrameEvent;
