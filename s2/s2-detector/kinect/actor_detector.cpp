@@ -1,6 +1,7 @@
 #include "stdafx.h"
-#include "SkeletalViewer.h"
+#include <time.h>
 #include <sstream>
+#include "SkeletalViewer.h"
 
 #include "actor_detector.h"
 
@@ -13,6 +14,39 @@ namespace Sauron
     , m_next(0)
   {
     m_output.open("data.csv", ios::out | ios::app);
+
+    // Header
+    m_output << "date,";
+    m_output << "time,";
+    m_output << "actor,";
+    m_output << "HIP_CENTER to SPINE,";
+    m_output << "SPINE to SHOULDER_CENTER,";
+    m_output << "SHOULDER_CENTER to HEAD,";
+
+    // Top left side of body
+    m_output << "SHOULDER_CENTER to SHOULDER_LEFT,";
+    m_output << "SHOULDER_LEFT to ELBOW_LEFT,";
+    m_output << "ELBOW_LEFT to WRIST_LEFT,";
+    m_output << "WRIST_LEFT to HAND_LEFT,";
+
+    // Top right side of body
+    m_output << "SHOULDER_CENTER to SHOULDER_RIGHT,";
+    m_output << "SHOULDER_RIGHT to ELBOW_RIGHT,";
+    m_output << "ELBOW_RIGHT to WRIST_RIGHT,";
+    m_output << "WRIST_RIGHT to HAND_RIGHT,";
+
+    // Bottom left side of body
+    m_output << "HIP_CENTER to HIP_LEFT,";
+    m_output << "HIP_LEFT to KNEE_LEFT,";
+    m_output << "KNEE_LEFT to ANKLE_LEFT,";
+    m_output << "ANKLE_LEFT to FOOT_LEFT,";
+
+    // Bottom right side of body
+    m_output << "HIP_CENTER to HIP_RIGHT,";
+    m_output << "HIP_RIGHT to KNEE_RIGHT,";
+    m_output << "KNEE_RIGHT to ANKLE_RIGHT,";
+    m_output << "ANKLE_RIGHT to FOOT_RIGHT,";
+    m_output << "\n";
   }
 
   ActorDetector::~ActorDetector()
@@ -35,10 +69,12 @@ namespace Sauron
 
     FLOAT lengths[SEGMENT_COUNT];
 
+    /*
     RECT rt;
     GetWindowRect(hWnd, &rt);
     rt.top = 10;
     rt.bottom = 30;
+    */
 
     // Only take a snapshot of the skeletal lengths if the actor is within
     // a certain distance from the camera.
@@ -54,13 +90,26 @@ namespace Sauron
         return;
       }
 
-      // Ensure the actor is walking towards the camera
+      // Ensure the actor is walking towards the camera.
       if (m_spinePosHist[m_next] <= m_spinePosHist[m_next ^ 1])
       {
         return;
       }
 
+      // Sound for audio feedback of recognized person.
       Beep(550, 50);
+
+      char dateStr[9];
+      char timeStr[9];
+      _strdate_s(dateStr);
+      _strtime_s(timeStr);
+      m_output << dateStr;
+      m_output << ",";
+      m_output << timeStr;
+      m_output << ",";
+      m_output << WhichSkeletonColor;
+      m_output << ",";
+
       for (int i = 0; i < SEGMENT_COUNT; ++i)
       {
         const NUI_SKELETON_POSITION_INDEX& a = g_Segments[i].a;
@@ -76,7 +125,8 @@ namespace Sauron
         lengths[i] = SQUARE(pSkel->SkeletonPositions[b].x - pSkel->SkeletonPositions[a].x) +
                      SQUARE(pSkel->SkeletonPositions[b].y - pSkel->SkeletonPositions[a].y);
 
-        // Print out lengths to screen
+        // Print out lengths to screen.
+        /*
         std::wstringstream s;
         s << i << L"=" << lengths[i];
         DrawText(GetDC(hWnd), s.str().c_str(), 10, &rt, DT_LEFT);
@@ -90,12 +140,14 @@ namespace Sauron
           rt.left += 100;
           rt.right += 100;
         }
+        */
 
-        // Print out lengths to a file
+        // Print out lengths to a file.
         m_output << lengths[i];
         m_output << ",";
       }
       m_output << "\n";
+      m_output.flush();
     }
   }
 }
