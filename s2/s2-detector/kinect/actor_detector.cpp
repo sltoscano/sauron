@@ -76,10 +76,17 @@ namespace Sauron
     rt.bottom = 30;
     */
 
+    FLOAT f = SQUARE(pSkel->SkeletonPositions[NUI_SKELETON_POSITION_KNEE_LEFT].x - pSkel->SkeletonPositions[NUI_SKELETON_POSITION_ANKLE_LEFT].x) +
+      SQUARE(pSkel->SkeletonPositions[NUI_SKELETON_POSITION_KNEE_LEFT].y - pSkel->SkeletonPositions[NUI_SKELETON_POSITION_ANKLE_LEFT].y);
+
+    FLOAT g = SQUARE(pSkel->SkeletonPositions[NUI_SKELETON_POSITION_KNEE_RIGHT].x - pSkel->SkeletonPositions[NUI_SKELETON_POSITION_ANKLE_RIGHT].x) +
+      SQUARE(pSkel->SkeletonPositions[NUI_SKELETON_POSITION_KNEE_RIGHT].y - pSkel->SkeletonPositions[NUI_SKELETON_POSITION_ANKLE_RIGHT].y);
+
     // Only take a snapshot of the skeletal lengths if the actor is within
     // a certain distance from the camera.
-    if ((spinePos.z > (SNAPSHOT_DEPTH - 0.05f)) &&
-      (spinePos.z < (SNAPSHOT_DEPTH + 0.05f)))
+    if (((spinePos.z > (SNAPSHOT_DEPTH - 0.2f)) &&
+         (spinePos.z < (SNAPSHOT_DEPTH + 0.2f))) &&
+        ((f - g) < 0.001f))
     {
       m_spinePosHist[m_next] = spinePos.z;
       m_next ^= 1;
